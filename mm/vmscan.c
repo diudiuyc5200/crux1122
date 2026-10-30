@@ -3855,7 +3855,7 @@ static bool try_to_inc_max_seq(struct lruvec *lruvec, unsigned long max_seq,
 	 * handful of PTEs. Spreading the work out over a period of time usually
 	 * is less efficient, but it avoids bursty page faults.
 	 */
-	if (!force_scan && !(arch_has_hw_pte_young() && get_cap(LRU_GEN_MM_WALK))) {
+	if (!arch_has_hw_pte_young() && get_cap(LRU_GEN_MM_WALK)) {
 		success = iterate_mm_list_nowalk(lruvec, max_seq);
 		goto done;
 	}
@@ -3878,7 +3878,7 @@ static bool try_to_inc_max_seq(struct lruvec *lruvec, unsigned long max_seq,
 	} while (mm);
 done:
 	if (success)
-		inc_max_seq(lruvec, can_swap, force_scan);
+		inc_max_seq(lruvec);
 
 	return success;
 }
@@ -4487,7 +4487,6 @@ retry:
 
 		/* retry pages that may have missed page_rotate_reclaimable() */
 		list_move(&page->lru, &clean);
-		sc->nr_scanned -= (1 << compound_order(page));
 	}
 
 	spin_lock_irq(&pgdat->lru_lock);
