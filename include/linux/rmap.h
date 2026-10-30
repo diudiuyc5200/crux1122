@@ -139,6 +139,11 @@ static inline void anon_vma_lock_read(struct anon_vma *anon_vma)
 	down_read(&anon_vma->root->rwsem);
 }
 
+static inline int anon_vma_trylock_read(struct anon_vma *anon_vma)
+{
+	return down_read_trylock(&anon_vma->root->rwsem);
+}
+
 static inline void anon_vma_unlock_read(struct anon_vma *anon_vma)
 {
 	up_read(&anon_vma->root->rwsem);
@@ -257,8 +262,7 @@ void remove_migration_ptes(struct page *old, struct page *new, bool locked);
 /*
  * Called by memory-failure.c to kill processes.
  */
-struct anon_vma *page_lock_anon_vma_read(struct page *page);
-void page_unlock_anon_vma_read(struct anon_vma *anon_vma);
+ 
 int page_mapped_in_vma(struct page *page, struct vm_area_struct *vma);
 
 /*
@@ -272,6 +276,8 @@ int page_mapped_in_vma(struct page *page, struct vm_area_struct *vma);
  */
 struct rmap_walk_control {
 	void *arg;
+	bool try_lock;
+	bool contended;
 	struct vm_area_struct *target_vma;
 	/*
 	 * Return false if page table scanning in rmap_walk should be stopped.
@@ -280,12 +286,17 @@ struct rmap_walk_control {
 	bool (*rmap_one)(struct page *page, struct vm_area_struct *vma,
 					unsigned long addr, void *arg);
 	int (*done)(struct page *page);
-	struct anon_vma *(*anon_lock)(struct page *page);
+	struct anon_vma *(*anon_lock)(struct page *page,
+								  struct rmap_walk_control *rwc);
 	bool (*invalid_vma)(struct vm_area_struct *vma, void *arg);
 };
 
 void rmap_walk(struct page *page, struct rmap_walk_control *rwc);
 void rmap_walk_locked(struct page *page, struct rmap_walk_control *rwc);
+
+struct anon_vma *page_lock_anon_vma_read(struct page *page,
+										 struct rmap_walk_control *rwc);
+void page_unlock_anon_vma_read(struct anon_vma *anon_vma);
 
 #else	/* !CONFIG_MMU */
 
