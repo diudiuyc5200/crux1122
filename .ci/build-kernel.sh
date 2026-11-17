@@ -27,6 +27,11 @@ BUILD_ARGS=(ARCH=$ARCH
 cd "$KERNEL_DIR"
 rm -rf out && mkdir -p out
 
+echo "::group::clean source tree"
+make ARCH=$ARCH mrproper >/dev/null 2>&1 || true
+rm -f .config .config.old include/config/auto.conf
+rm -rf include/config include/generated
+echo "::endgroup::"
 echo "::group::defconfig + fragment"
 make "${CFG_ARGS[@]}" "$DEFCONFIG"
 bash scripts/kconfig/merge_config.sh -m out/.config "$FRAGMENT" \
