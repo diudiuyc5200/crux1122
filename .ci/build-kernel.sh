@@ -56,7 +56,9 @@ if [ "$BUILD_RC" -ne 0 ]; then
     exit 1
 fi
 echo "::group::pack boot.img"
-MKBOOTIMG="$WORKDIR/mkbootimg/mkbootimg.py"
+MKBOOTIMG="$(find "$HOME/kernel-build/mkbootimg" -name 'mkbootimg.py' 2>/dev/null | head -1)"
+if [ -z "$MKBOOTIMG" ]; then echo "::error::mkbootimg.py not found"; exit 1; fi
+echo "using $MKBOOTIMG"
 BOARD_CMDLINE="cgroup_disable=pressure console=ttyMSM0,115200n8 androidboot.console=ttyMSM0 androidboot.hardware=qcom msm_rtb.filter=0x237 ehci-hcd.park=3 lpm_levels.sleep_disabled=1 androidboot.bootdevice=1d84000.ufshc earlycon=msm_geni_serial,0x880000 loop.max_part=7 buildvariant=user"
 python3 "$MKBOOTIMG" \
     --base 0x00000000 \
@@ -67,5 +69,10 @@ python3 "$MKBOOTIMG" \
     --os_version 10 \
     --os_patch_level 2099-12 \
     --output out/boot.img
+PACK_RC=$?
+if [ "$PACK_RC" -ne 0 ] || [ ! -f out/boot.img ]; then
+    echo "::error::boot.img packing failed (rc=$PACK_RC)"
+    exit 1
+fi
 echo "::endgroup::"
 ls -lh out/boot.img out/arch/arm64/boot/Image* 2>/dev/null || true
