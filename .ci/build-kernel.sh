@@ -18,6 +18,8 @@ MAKE_COMMON=(ARCH=$ARCH
   CROSS_COMPILE=aarch64-linux-gnu-)
 
 cd "$KERNEL_DIR"
+# Fresh checkout is already clean; drop any stray build leftovers just in case.
+git clean -fdx -e .ci -e .github >/dev/null 2>&1 || true
 rm -f .config include/config/auto.conf 2>/dev/null; true
 
 echo "::group::defconfig + fragment"
