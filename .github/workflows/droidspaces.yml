@@ -1,0 +1,49 @@
+name: Droidspaces Kernel (crux-marisa A16)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [A16-droidspaces]
+
+env:
+  DEBIAN_FRONTEND: noninteractive
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout kernel
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install toolchain deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bison build-essential bc curl flex \
+            libssl-dev libncurses5-dev python3 cpio xz-utils lz4 git
+
+      - name: Setup proton-clang
+        run: |
+          mkdir -p "$HOME/kernel-build"
+          git clone --depth=1 https://github.com/kdrag0n/proton-clang.git \
+            "$HOME/kernel-build/proton-clang"
+
+      - name: Setup mkbootimg
+        run: |
+          git clone --depth=1 https://github.com/osm0sis/mkbootimg.git \
+            "$HOME/kernel-build/mkbootimg"
+
+      - name: Build
+        run: bash .ci/build-kernel.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: crux-droidspaces-boot
+          path: |
+            out/boot.img
+            out/arch/arm64/boot/Image.lz4-dtb
+            out/.config
+            build.log
