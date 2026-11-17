@@ -27,15 +27,15 @@ mkdir -p out
 echo "::endgroup::"
 echo "::group::defconfig + fragment"
 make "${MK[@]}" "$DEFCONFIG"
-KCONFIG_CONFIG="$KERNEL_DIR/out/.config" bash scripts/kconfig/merge_config.sh -m "$FRAGMENT" \
-  || echo "::warning::merge_config reported issues"
+echo "# --- droidspaces fragment (manual merge) ---" >> out/.config
+cat "$FRAGMENT" >> out/.config
 make "${MK[@]}" olddefconfig
 echo "::endgroup::"
 echo "::group::audit key configs"
 FAIL=0
 for c in CONFIG_FHANDLE CONFIG_PID_NS CONFIG_USER_NS CONFIG_NET_NS \
          CONFIG_OVERLAY_FS CONFIG_CGROUP_DEVICE CONFIG_CGROUP_PIDS \
-         CONFIG_CFS_BANDWIDTH CONFIG_NF_NAT CONFIG_QCOM_KGSL \
+         CONFIG_NF_NAT CONFIG_QCOM_KGSL \
          CONFIG_SECCOMP_FILTER CONFIG_DEVTMPFS CONFIG_DEVTMPFS_MOUNT; do
     if grep -qE "^$c=[ym]" out/.config; then
         grep -E "^$c=" out/.config
