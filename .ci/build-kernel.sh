@@ -27,8 +27,8 @@ mkdir -p out
 echo "::endgroup::"
 echo "::group::defconfig + fragment"
 make "${MK[@]}" "$DEFCONFIG"
-bash scripts/kconfig/merge_config.sh -m out/.config "$FRAGMENT" \
-  || echo "::warning::merge_config had unmet symbols"
+KCONFIG_CONFIG="$KERNEL_DIR/out/.config" bash scripts/kconfig/merge_config.sh -m "$FRAGMENT" \
+  || echo "::warning::merge_config reported issues"
 make "${MK[@]}" olddefconfig
 echo "::endgroup::"
 echo "::group::audit key configs"
