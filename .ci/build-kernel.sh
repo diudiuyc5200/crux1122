@@ -4,7 +4,7 @@
 set -uo pipefail
 
 WORKDIR="${WORKDIR:-$HOME/kernel-build}"
-KERNEL_DIR="$(git rev-parse --show-toplevel)"
+KERNEL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEFCONFIG="crux_defconfig"
 FRAGMENT="$KERNEL_DIR/.ci/droidspaces.config"
 CLANG_BIN="$WORKDIR/proton-clang/bin"
@@ -44,12 +44,9 @@ grep -E '^CONFIG_KSU=[ym]' out/.config || { echo 'MISSING: CONFIG_KSU'; FAIL=1; 
 [ "$FAIL" = 1 ] && echo "::warning::some required configs missing" || true
 echo "::endgroup::"
 
-echo "::group::build Image.gz-dtb + dtbo"
+echo "::group::build Image.gz-dtb"
 make -j"$JOBS" "${MAKE_COMMON[@]}" Image.gz-dtb 2>&1 | tee build.log
 BUILD_RC=${PIPESTATUS[0]}
-if [ "$BUILD_RC" -eq 0 ] && [ -f out/arch/arm64/boot/dtbo.img ]; then
-    echo "dtbo.img built"
-fi
 echo "::endgroup::"
 
 if [ "$BUILD_RC" -ne 0 ]; then
@@ -57,6 +54,11 @@ if [ "$BUILD_RC" -ne 0 ]; then
     tail -50 build.log
     exit 1
 fi
+
+echo "::group::build dtbo.img (optional)"
+make -j"$JOBS" "${MAKE_COMMON[@]}" dtbo.img 2>&1 | tee dtbo.log \
+    && echo "dtbo.img built" || echo "::warning::dtbo.img build failed, continuing with boot.img only"
+echo "::endgroup::"
 
 echo "::group::pack boot.img"
 MKBOOTIMG="$WORKDIR/mkbootimg/mkbootimg.py"
