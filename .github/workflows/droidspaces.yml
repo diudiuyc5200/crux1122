@@ -40,6 +40,8 @@ jobs:
         run: |
           git clone --depth=1 https://github.com/osm0sis/mkbootimg.git \
             "$HOME/kernel-build/mkbootimg"
+          make -C "$HOME/kernel-build/mkbootimg" -j2
+          "$HOME/kernel-build/mkbootimg/mkbootimg" --help 2>&1 | head -3 || true
 
       - name: Build
         run: bash .ci/build-kernel.sh
