@@ -29,6 +29,13 @@ jobs:
           git clone --depth=1 https://github.com/kdrag0n/proton-clang.git \
             "$HOME/kernel-build/proton-clang"
 
+      - name: Symlink llvm tools into PATH (recordmcount needs llvm-objdump)
+        run: |
+          for t in "$HOME"/kernel-build/proton-clang/bin/llvm-*; do
+            sudo ln -sf "$t" /usr/local/bin/"$(basename "$t")"
+          done
+          llvm-objdump --version | head -2 || true
+
       - name: Setup mkbootimg
         run: |
           git clone --depth=1 https://github.com/osm0sis/mkbootimg.git \
