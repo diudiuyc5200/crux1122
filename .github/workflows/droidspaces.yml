@@ -43,7 +43,8 @@ jobs:
         with:
           name: crux-droidspaces-boot
           path: |
-            out/boot.img
-            out/arch/arm64/boot/Image.lz4-dtb
-            out/.config
+            boot.img
+            arch/arm64/boot/Image.gz-dtb
+            arch/arm64/boot/dtbo.img
+            .config
             build.log

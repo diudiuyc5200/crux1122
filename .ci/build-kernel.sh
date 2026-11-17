@@ -10,7 +10,7 @@ FRAGMENT="$KERNEL_DIR/.ci/droidspaces.config"
 CLANG_BIN="$WORKDIR/proton-clang/bin"
 ARCH=arm64
 JOBS="$(nproc)"
-MAKE_COMMON=(O=out ARCH=$ARCH
+MAKE_COMMON=(ARCH=$ARCH
   CC="$CLANG_BIN/clang" LD="$CLANG_BIN/ld.lld"
   AR="$CLANG_BIN/llvm-ar" NM="$CLANG_BIN/llvm-nm"
   OBJCOPY="$CLANG_BIN/llvm-objcopy" STRIP="$CLANG_BIN/llvm-strip"
@@ -18,11 +18,11 @@ MAKE_COMMON=(O=out ARCH=$ARCH
   CROSS_COMPILE=aarch64-linux-gnu-)
 
 cd "$KERNEL_DIR"
-rm -rf out && mkdir -p out
+rm -f .config include/config/auto.conf 2>/dev/null; true
 
 echo "::group::defconfig + fragment"
 make "${MAKE_COMMON[@]}" "$DEFCONFIG"
-bash scripts/kconfig/merge_config.sh -m out/.config "$FRAGMENT" \
+bash scripts/kconfig/merge_config.sh -m .config "$FRAGMENT" \
   || echo "::warning::merge_config had unmet symbols"
 make "${MAKE_COMMON[@]}" olddefconfig
 echo "::endgroup::"
@@ -33,14 +33,14 @@ for c in CONFIG_FHANDLE CONFIG_PID_NS CONFIG_USER_NS CONFIG_NET_NS \
          CONFIG_OVERLAY_FS CONFIG_CGROUP_DEVICE CONFIG_CGROUP_PIDS \
          CONFIG_CFS_BANDWIDTH CONFIG_NF_NAT CONFIG_QCOM_KGSL \
          CONFIG_SECCOMP_FILTER; do
-    if grep -qE "^$c=[ym]" out/.config; then
-        grep -E "^$c=" out/.config
+    if grep -qE "^$c=[ym]" .config; then
+        grep -E "^$c=" .config
     else
         echo "MISSING: $c"; FAIL=1
     fi
 done
 # KSU is tristate; built-in preferred
-grep -E '^CONFIG_KSU=[ym]' out/.config || { echo 'MISSING: CONFIG_KSU'; FAIL=1; }
+grep -E '^CONFIG_KSU=[ym]' .config || { echo 'MISSING: CONFIG_KSU'; FAIL=1; }
 [ "$FAIL" = 1 ] && echo "::warning::some required configs missing" || true
 echo "::endgroup::"
 
@@ -67,12 +67,12 @@ BOARD_CMDLINE="cgroup_disable=pressure console=ttyMSM0,115200n8 androidboot.cons
 python3 "$MKBOOTIMG" \
     --base 0x00000000 \
     --pagesize 4096 \
-    --dtb out/arch/arm64/boot/Image.gz-dtb \
+    --dtb arch/arm64/boot/Image.gz-dtb \
     --cmdline "$BOARD_CMDLINE" \
     --header_version 0 \
     --os_version 10 \
     --os_patch_level 2099-12 \
-    --output out/boot.img
+    --output boot.img
 echo "::endgroup::"
 
-ls -lh out/boot.img out/arch/arm64/boot/Image* out/arch/arm64/boot/dtbo.img 2>/dev/null || true
+ls -lh boot.img arch/arm64/boot/Image* arch/arm64/boot/dtbo.img 2>/dev/null || true
