@@ -138,14 +138,23 @@ echo "::endgroup::"
 # file instead of the real .config (ifneq rules for other products win in O=out
 # builds). Replace with standard upstream recipe depending on .config.
 python3 - <<'PYMK'
-import re
 mk="kernel/Makefile"
-src=open(mk).read()
-pat=re.compile(r"targets \+= config_data\.gz\n(?:ifneq.*?\n\$\(obj\)/config_data\.gz: arch/arm64/configs/\S+ FORCE\nendif\n)+")
-assert pat.search(src), "vendor IKCONFIG block not found"
-src=pat.sub("targets += config_data.gz\n$(obj)/config_data.gz: $(KCONFIG_OUT_CONFIG) FORCE\n", src, count=1)
-open(mk,"w").write(src)
-print("kernel/Makefile patched:", [l for l in src.splitlines() if "config_data.gz:" in l])
+lines=open(mk).read().split("\n")
+out=[]; i=0; removed=0
+while i < len(lines):
+    l=lines[i]
+    if l.startswith("$(obj)/config_data.gz: arch/arm64/configs/"):
+        removed+=1; i+=1
+        while i < len(lines) and lines[i].strip()!="endif":
+            i+=1
+        continue
+    out.append(l); i+=1
+assert removed==3, "expected 3 stock rules, got %d" % removed
+# insert standard upstream dependency after "targets += config_data.gz"
+ti=[n for n,x in enumerate(out) if x.strip()=="targets += config_data.gz"][0]
+out.insert(ti+1, "$(obj)/config_data.gz: $(KCONFIG_OUT_CONFIG) FORCE")
+open(mk,"w").write("\n".join(out))
+print("kernel/Makefile patched, removed", removed, "stock rules")
 PYMK
 echo "::group::build Image.gz-dtb"
 # Debug: find which file carries the stock pre-baked config markers.
