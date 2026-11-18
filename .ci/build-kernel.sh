@@ -152,7 +152,7 @@ while i < len(lines):
 assert removed==3, "expected 3 stock rules, got %d" % removed
 # insert standard upstream dependency after "targets += config_data.gz"
 ti=[n for n,x in enumerate(out) if x.strip()=="targets += config_data.gz"][0]
-out.insert(ti+1, "$(obj)/config_data.gz: $(KCONFIG_OUT_CONFIG) FORCE")
+out.insert(ti+1, "$(obj)/config_data.gz: $(realpath $(obj))/../.config FORCE")
 open(mk,"w").write("\n".join(out))
 print("kernel/Makefile patched, removed", removed, "stock rules")
 PYMK
