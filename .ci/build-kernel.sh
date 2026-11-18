@@ -166,6 +166,8 @@ for c in CONFIG_MACVLAN CONFIG_IP6_NF_NAT CONFIG_IP6_NF_TARGET_MASQUERADE; do
 done
 if [ -f include/config/auto.conf ]; then grep -E '^CONFIG_(MACVLAN|IP6_NF_NAT)=' include/config/auto.conf || echo 'WARN: not in auto.conf'; fi
 make "${MK[@]}" -j"$JOBS" Image.gz-dtb 2>&1 | tee build.log
+BUILD_RC=${PIPESTATUS[0]}
+if [ "$BUILD_RC" != 0 ]; then echo "::error::kernel compile failed rc=$BUILD_RC"; grep -nE 'error:|Error|FAILED' build.log | tail -40 || true; exit 1; fi
 # Post-build: verify the IKCFG blob embedded in the actual artifact.
 python3 - <<'PYIKCFG'
 import zlib, gzip, sys
@@ -193,13 +195,7 @@ sys.exit(0 if ok else 1)
 PYIKCFG
 IKRC=$?
 if [ "$IKRC" != 0 ]; then echo "::error::embedded IKCFG does not match fragment"; exit 1; fi
-BUILD_RC=${PIPESTATUS[0]}
 echo "::endgroup::"
-if [ "$BUILD_RC" -ne 0 ]; then
-    echo "::error::kernel build failed (rc=$BUILD_RC)"
-    grep -nE 'error:|Error|FAILED' build.log | tail -40 || true
-    exit 1
-fi
 echo "::group::pack boot.img"
 MKBOOTIMG="$HOME/kernel-build/mkbootimg/mkbootimg"
 if [ ! -x "$MKBOOTIMG" ]; then echo "::error::mkbootimg binary not found at $MKBOOTIMG"; exit 1; fi
