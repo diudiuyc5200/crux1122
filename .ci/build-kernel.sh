@@ -134,6 +134,19 @@ done
 grep -E '^CONFIG_KSU=[ym]' out/.config || { echo 'MISSING: CONFIG_KSU'; FAIL=1; }
 if [ "$FAIL" = 1 ]; then echo "::error::required configs missing"; exit 1; fi
 echo "::endgroup::"
+# --- Fix vendor IKCONFIG hijack: kernel/Makefile embeds a stock defconfig
+# file instead of the real .config (ifneq rules for other products win in O=out
+# builds). Replace with standard upstream recipe depending on .config.
+python3 - <<'PYMK'
+import re
+mk="kernel/Makefile"
+src=open(mk).read()
+pat=re.compile(r"targets \+= config_data\.gz\n(?:ifneq.*?\n\$\(obj\)/config_data\.gz: arch/arm64/configs/\S+ FORCE\nendif\n)+")
+assert pat.search(src), "vendor IKCONFIG block not found"
+src=pat.sub("targets += config_data.gz\n$(obj)/config_data.gz: $(KCONFIG_OUT_CONFIG) FORCE\n", src, count=1)
+open(mk,"w").write(src)
+print("kernel/Makefile patched:", [l for l in src.splitlines() if "config_data.gz:" in l])
+PYMK
 echo "::group::build Image.gz-dtb"
 # Debug: find which file carries the stock pre-baked config markers.
 grep -l 'PRODUCT_CRUX is not set' arch/arm64/configs/* 2>/dev/null || true
