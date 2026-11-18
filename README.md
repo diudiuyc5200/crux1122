@@ -32,3 +32,48 @@ stock config, regardless of what was actually compiled in. `.ci/build-kernel.sh`
 dependency on the out-of-tree `.config`. Without this patch, any defconfig /
 fragment changes are invisible to config forensics even though the compiled
 kernel itself may be correct.
+
+
+## Bootloop lessons (hard rules for this tree)
+
+Two config changes were proven to bootloop on real crux hardware and are permanently banned:
+
+1. **CONFIG_PSTORE / PSTORE_RAM** (v3, Run #31): crux's merged DTB has no usable ramoops
+   node; enabling pstore console backend hangs early boot. Never enable without adding a
+   ramoops node in dts + memmap reservation.
+2. **CONFIG_SECURITY_YAMA=y** (v6/v7, Runs #35/#36): YAMA LSM registration breaks vendor
+   sepolicy assumptions at boot (stock ships it "not set"). Binary-search evidence: v7
+   restored SYSFS_SYSCALL=y but kept YAMA=y and still bootlooped; SYSFS_SYSCALL=n is
+   therefore NOT the culprit (v8 with SYSFS_SYSCALL=y boots fine).
+
+General rule derived: only ADD pure networking/module symbols that have no stock conflict.
+Never flip stock-y syscall-table/security/pstore symbols. FHANDLE=off is the single
+exception, forced by FCM3 VINTF, verified safe on v4+.
+
+## Final verdict on the boot dialog ("device internal problem")
+
+Root cause: framework-side VINTF kernel compatibility check (ActivityManagerService.systemReady
+-> Build.isBuildConsistent -> libvintf vs compatibility_matrix.3.xml). It is NON-FATAL, shows
+once per boot.
+
+After fixing every fixable violation (AUDIT=y, FHANDLE off, SYSFS_SYSCALL attempt reverted),
+the remaining required symbols DO NOT EXIST in this 4.14 source tree and are equally absent
+from the stock kernel:
+
+- CONFIG_SECURITY_PERF_EVENTS_RESTRICT
+- CONFIG_SYNC (= staging android sync was removed upstream; matrix expects the old name)
+- CONFIG_ANDROID_PARANOID
+- CONFIG_ARM64_UDF
+- CONFIG_DEBUG_RODATA (renamed to SET_MODULE_DEPRECATED family in newer kernels)
+
+Conclusion: the dialog cannot be eliminated from the kernel side on this ROM; it is a
+pre-existing ROM/kernel-matrix inconsistency (present regardless of our build; confirmed
+still showing after flashing back v2). Only remaining option if desired: Magisk module
+patching Build.isBuildConsistent()/showSystemReadyErrorDialogs (userspace, out of scope
+for this repo).
+
+## Verified-good baseline
+
+repacked_v8.img == Run #37 artifact, IKCFG byte-for-byte equal to v4 (Run #33) symbol set:
+MACVLAN/IP6_NF_NAT/IP6_NF_TARGET_MASQUERADE =y (Droidspaces checks all green), AUDIT=y,
+FHANDLE off, everything else stock. This is the release state of the project.
