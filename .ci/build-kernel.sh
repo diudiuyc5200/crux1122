@@ -63,7 +63,7 @@ BOARD_CMDLINE="cgroup_disable=pressure console=ttyMSM0,115200n8 androidboot.cons
 "$MKBOOTIMG" \
     --base 0x00000000 \
     --pagesize 4096 \
-    --dtb out/arch/arm64/boot/Image.gz-dtb \
+    --kernel out/arch/arm64/boot/Image.gz-dtb \
     --cmdline "$BOARD_CMDLINE" \
     --output out/boot.img
 PACK_RC=$?
