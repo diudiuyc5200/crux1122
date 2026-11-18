@@ -36,7 +36,8 @@ FAIL=0
 for c in CONFIG_FHANDLE CONFIG_PID_NS CONFIG_USER_NS CONFIG_NET_NS \
          CONFIG_OVERLAY_FS CONFIG_CGROUP_DEVICE CONFIG_CGROUP_PIDS \
          CONFIG_NF_NAT CONFIG_QCOM_KGSL \
-         CONFIG_SECCOMP_FILTER CONFIG_DEVTMPFS CONFIG_DEVTMPFS_MOUNT; do
+         CONFIG_SECCOMP_FILTER CONFIG_DEVTMPFS CONFIG_DEVTMPFS_MOUNT \
+         CONFIG_MACVLAN CONFIG_IP6_NF_NAT CONFIG_IP6_NF_TARGET_MASQUERADE; do
     if grep -qE "^$c=[ym]" out/.config; then
         grep -E "^$c=" out/.config
     else
@@ -59,7 +60,7 @@ echo "::group::pack boot.img"
 MKBOOTIMG="$HOME/kernel-build/mkbootimg/mkbootimg"
 if [ ! -x "$MKBOOTIMG" ]; then echo "::error::mkbootimg binary not found at $MKBOOTIMG"; exit 1; fi
 echo "using $MKBOOTIMG"
-BOARD_CMDLINE="cgroup_disable=pressure console=ttyMSM0,115200n8 androidboot.console=ttyMSM0 androidboot.hardware=qcom msm_rtb.filter=0x237 ehci-hcd.park=3 lpm_levels.sleep_disabled=1 androidboot.bootdevice=1d84000.ufshc earlycon=msm_geni_serial,0x880000 loop.max_part=7 buildvariant=user"
+BOARD_CMDLINE="console=ttyMSM0,115200n8 earlycon=msm_geni_serial,0xa90000 androidboot.hardware=qcom androidboot.console=ttyMSM0 androidboot.memcg=1 lpm_levels.sleep_disabled=1 video=vfb:640x400,bpp=32,memsize=3072000 msm_rtb.filter=0x237 service_locator.enable=1 swiotlb=2048 loop.max_part=7 androidboot.usbcontroller=a600000.dwc3 buildvariant=user"
 "$MKBOOTIMG" \
     --base 0x00000000 \
     --pagesize 4096 \
