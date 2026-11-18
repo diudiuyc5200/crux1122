@@ -30,42 +30,6 @@ make "${MK[@]}" "$DEFCONFIG"
 echo "# --- droidspaces fragment (manual merge) ---" >> out/.config
 cat "$FRAGMENT" >> out/.config
 make "${MK[@]}" olddefconfig
-# Force-tristate: append+olddefconfig can silently drop symbols whose deps
-# were not yet visible in the base config. Re-assert every fragment
-# symbol and re-resolve until stable.
-python3 - <<'PYFIX'
-import re, subprocess, os
-frag = os.environ.get('FRAGMENT', '.ci/droidspaces.config')
-want = {}
-for line in open(frag):
-    m = re.match(r'^(CONFIG_[A-Za-z0-9_]+)=([ym])$', line.strip())
-    if m:
-        want[m.group(1)] = m.group(2)
-env = dict(os.environ)
-for attempt in range(5):
-    cur = {}
-    for line in open('out/.config'):
-        m = re.match(r'^(CONFIG_[A-Za-z0-9_]+)=(.*)$', line.strip())
-        if m:
-            cur[m.group(1)] = m.group(2)
-    missing = {k: v for k, v in want.items() if cur.get(k) != v}
-    if not missing:
-        print('fragment fully applied after %d pass(es)' % attempt)
-        break
-    print('pass %d: re-asserting %s' % (attempt, sorted(missing)))
-    with open('out/.config', 'a') as fcfg:
-        for k, v in missing.items():
-            fcfg.write('%s=%s'%(k,v)+chr(10))
-    subprocess.run(['make', 'ARCH=arm64', 'O=out', 'olddefconfig'], check=True,
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-else:
-    still = []
-    for line in open('out/.config'):
-        m = re.match(r'^(CONFIG_[A-Za-z0-9_]+)=(.*)$', line.strip())
-        if m and m.group(1) in want and m.group(2) != want[m.group(1)]:
-            still.append(m.group(1) + '=' + m.group(2))
-    print('UNRESOLVED:', still)
-PYFIX
 echo "::endgroup::"
 echo "::group::audit key configs"
 FAIL=0
