@@ -84,6 +84,39 @@ print('fragment fully applied (%d symbols)' % len(wanted))
 PYVERIFY
 RC=$?
 if [ "$RC" != 0 ]; then echo "::error::fragment merge failed"; exit 1; fi
+# Snapshot the verified config, then REGENERATE it from scratch via
+# KCONFIG_ALLCONFIG so that no vendor pre-baked .config copy step can clobber
+# our fragment later in the build. `make allnoconfig KCONFIG_ALLCONFIG=...`
+# resolves ONLY against our file + Kconfig deps; it does not run any product-
+# specific defconfig hook.
+cp out/.config out/.config.merged
+rm -rf include/config include/generated out/include/config out/include/generated
+make "${MK[@]}" allnoconfig >/dev/null
+make KCONFIG_ALLCONFIG="$PWD/out/.config.merged" "${MK[@]}" alldefconfig
+# Restore full-fidelity merged config as authoritative input, then sync.
+cp out/.config.merged out/.config
+make "${MK[@]}" olddefconfig
+# Second verification pass on the regenerated config.
+python3 - <<'PYVERIFY2'
+import re, sys
+wanted = {}
+for line in open('.ci/droidspaces.config'):
+    m = re.match(r'^(CONFIG_[A-Za-z0-9_]+)=([ym])$', line.strip())
+    if m:
+        wanted[m.group(1)] = m.group(2)
+cur = {}
+for line in open('out/.config'):
+    m = re.match(r'^(CONFIG_[A-Za-z0-9_]+)=(.*)$', line.strip())
+    if m:
+        cur.setdefault(m.group(1), m.group(2))
+bad = [(k, cur.get(k, 'ABSENT')) for k, v in wanted.items() if cur.get(k) != v]
+if bad:
+    print('REGEN FRAGMENT LOST:', bad)
+    sys.exit(1)
+print('regen verified (%d symbols)' % len(wanted))
+PYVERIFY2
+RC=$?
+if [ "$RC" != 0 ]; then echo "::error::regenerated config lost fragment symbols"; exit 1; fi
 echo "::endgroup::"
 echo "::group::audit key configs"
 FAIL=0
@@ -102,7 +135,42 @@ grep -E '^CONFIG_KSU=[ym]' out/.config || { echo 'MISSING: CONFIG_KSU'; FAIL=1; 
 if [ "$FAIL" = 1 ]; then echo "::error::required configs missing"; exit 1; fi
 echo "::endgroup::"
 echo "::group::build Image.gz-dtb"
+# Debug: find which file carries the stock pre-baked config markers.
+grep -l 'PRODUCT_CRUX is not set' arch/arm64/configs/* 2>/dev/null || true
+md5sum out/.config
+# Last-moment assertion: MACVLAN/IP6_NF must still be =y immediately before compile.
+for c in CONFIG_MACVLAN CONFIG_IP6_NF_NAT CONFIG_IP6_NF_TARGET_MASQUERADE; do
+  grep -qE "^$c=y" out/.config || { echo "::error::$c lost just before build"; md5sum out/.config; exit 1; }
+done
+if [ -f include/config/auto.conf ]; then grep -E '^CONFIG_(MACVLAN|IP6_NF_NAT)=' include/config/auto.conf || echo 'WARN: not in auto.conf'; fi
 make "${MK[@]}" -j"$JOBS" Image.gz-dtb 2>&1 | tee build.log
+# Post-build: verify the IKCFG blob embedded in the actual artifact.
+python3 - <<'PYIKCFG'
+import zlib, gzip, sys
+raw = open('out/arch/arm64/boot/Image.gz-dtb','rb').read()
+d = zlib.decompressobj(-15)
+img = d.decompress(raw[10:])
+i = img.find(b'IKCFG_ST')
+if i < 0:
+    print('NO IKCFG in artifact'); sys.exit(1)
+seg = img[i+8:]
+e = seg.find(b'IKCFG_ED')
+try:
+    cfg = gzip.decompress(seg[:e]).decode()
+except Exception:
+    cfg = zlib.decompressobj(-15).decompress(seg[10:e]).decode()
+ok = True
+for k in ['CONFIG_MACVLAN','CONFIG_IP6_NF_NAT','CONFIG_IP6_NF_TARGET_MASQUERADE']:
+    hit = [l for l in cfg.splitlines() if l.startswith(k+'=') or l.startswith('# '+k+' is not set')]
+    want = '%s=y' % k
+    if want not in hit:
+        print('IKCFG BAD:', k, hit); ok = False
+    else:
+        print('IKCFG OK:', k)
+sys.exit(0 if ok else 1)
+PYIKCFG
+IKRC=$?
+if [ "$IKRC" != 0 ]; then echo "::error::embedded IKCFG does not match fragment"; exit 1; fi
 BUILD_RC=${PIPESTATUS[0]}
 echo "::endgroup::"
 if [ "$BUILD_RC" -ne 0 ]; then
