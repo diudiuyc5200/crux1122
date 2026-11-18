@@ -192,6 +192,11 @@ for k in ['CONFIG_MACVLAN','CONFIG_IP6_NF_NAT','CONFIG_IP6_NF_TARGET_MASQUERADE'
         print('IKCFG BAD:', k, hit); ok = False
     else:
         print('IKCFG OK:', k)
+ss=[l for l in cfg.splitlines() if l.startswith('CONFIG_SYSFS_SYSCALL=')]
+if ss:
+    print('IKCFG BAD: CONFIG_SYSFS_SYSCALL should be off, got', ss); ok=False
+else:
+    print('IKCFG OK: CONFIG_SYSFS_SYSCALL off')
 fh=[l for l in cfg.splitlines() if l.startswith('CONFIG_FHANDLE=')]
 if fh:
     print('IKCFG BAD: CONFIG_FHANDLE should be off, got', fh); ok=False
