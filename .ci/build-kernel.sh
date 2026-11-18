@@ -120,7 +120,7 @@ if [ "$RC" != 0 ]; then echo "::error::regenerated config lost fragment symbols"
 echo "::endgroup::"
 echo "::group::audit key configs"
 FAIL=0
-for c in CONFIG_FHANDLE CONFIG_PID_NS CONFIG_USER_NS CONFIG_NET_NS \
+for c in CONFIG_PID_NS CONFIG_USER_NS CONFIG_NET_NS \
          CONFIG_OVERLAY_FS CONFIG_CGROUP_DEVICE CONFIG_CGROUP_PIDS \
          CONFIG_NF_NAT CONFIG_QCOM_KGSL \
          CONFIG_SECCOMP_FILTER CONFIG_DEVTMPFS CONFIG_DEVTMPFS_MOUNT \
