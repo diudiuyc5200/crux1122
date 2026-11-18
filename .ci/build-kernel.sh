@@ -164,6 +164,7 @@ md5sum out/.config
 for c in CONFIG_MACVLAN CONFIG_IP6_NF_NAT CONFIG_IP6_NF_TARGET_MASQUERADE CONFIG_AUDIT CONFIG_PSTORE CONFIG_PSTORE_RAM; do
   grep -qE "^$c=y" out/.config || { echo "::error::$c lost just before build"; md5sum out/.config; exit 1; }
 done
+if grep -qE '^CONFIG_FHANDLE=y' out/.config; then echo "::error::CONFIG_FHANDLE must be off (FCM3)"; exit 1; fi
 if [ -f include/config/auto.conf ]; then grep -E '^CONFIG_(MACVLAN|IP6_NF_NAT)=' include/config/auto.conf || echo 'WARN: not in auto.conf'; fi
 make "${MK[@]}" -j"$JOBS" Image.gz-dtb 2>&1 | tee build.log
 BUILD_RC=${PIPESTATUS[0]}
@@ -191,6 +192,11 @@ for k in ['CONFIG_MACVLAN','CONFIG_IP6_NF_NAT','CONFIG_IP6_NF_TARGET_MASQUERADE'
         print('IKCFG BAD:', k, hit); ok = False
     else:
         print('IKCFG OK:', k)
+fh=[l for l in cfg.splitlines() if l.startswith('CONFIG_FHANDLE=')]
+if fh:
+    print('IKCFG BAD: CONFIG_FHANDLE should be off, got', fh); ok=False
+else:
+    print('IKCFG OK: CONFIG_FHANDLE off')
 sys.exit(0 if ok else 1)
 PYIKCFG
 IKRC=$?
