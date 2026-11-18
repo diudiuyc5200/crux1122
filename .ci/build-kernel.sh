@@ -161,7 +161,7 @@ echo "::group::build Image.gz-dtb"
 grep -l 'PRODUCT_CRUX is not set' arch/arm64/configs/* 2>/dev/null || true
 md5sum out/.config
 # Last-moment assertion: MACVLAN/IP6_NF must still be =y immediately before compile.
-for c in CONFIG_MACVLAN CONFIG_IP6_NF_NAT CONFIG_IP6_NF_TARGET_MASQUERADE; do
+for c in CONFIG_MACVLAN CONFIG_IP6_NF_NAT CONFIG_IP6_NF_TARGET_MASQUERADE CONFIG_AUDIT CONFIG_PSTORE CONFIG_PSTORE_RAM; do
   grep -qE "^$c=y" out/.config || { echo "::error::$c lost just before build"; md5sum out/.config; exit 1; }
 done
 if [ -f include/config/auto.conf ]; then grep -E '^CONFIG_(MACVLAN|IP6_NF_NAT)=' include/config/auto.conf || echo 'WARN: not in auto.conf'; fi
@@ -184,7 +184,7 @@ try:
 except Exception:
     cfg = zlib.decompressobj(-15).decompress(seg[10:e]).decode()
 ok = True
-for k in ['CONFIG_MACVLAN','CONFIG_IP6_NF_NAT','CONFIG_IP6_NF_TARGET_MASQUERADE']:
+for k in ['CONFIG_MACVLAN','CONFIG_IP6_NF_NAT','CONFIG_IP6_NF_TARGET_MASQUERADE','CONFIG_AUDIT','CONFIG_PSTORE','CONFIG_PSTORE_RAM']:
     hit = [l for l in cfg.splitlines() if l.startswith(k+'=') or l.startswith('# '+k+' is not set')]
     want = '%s=y' % k
     if want not in hit:
