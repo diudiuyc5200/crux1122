@@ -27,9 +27,63 @@ mkdir -p out
 echo "::endgroup::"
 echo "::group::defconfig + fragment"
 make "${MK[@]}" "$DEFCONFIG"
-echo "# --- droidspaces fragment (manual merge) ---" >> out/.config
-cat "$FRAGMENT" >> out/.config
+# In-place merge of the droidspaces fragment. kconfig's conf program keeps the
+# FIRST occurrence of a duplicated symbol when reading a .config, so appending
+# fragment lines to the end of out/.config is silently ignored by olddefconfig.
+# Instead: for each fragment symbol already present as "# X is not set", flip it
+# in place; append only symbols that are absent entirely.
+echo "# --- droidspaces fragment (in-place merge) ---"
+python3 - <<'PYMERGE'
+import re
+frag = open('.ci/droidspaces.config').read().splitlines()
+wanted = {}
+for line in frag:
+    m = re.match(r'^(CONFIG_[A-Za-z0-9_]+)=([ym])$', line.strip())
+    if m:
+        wanted[m.group(1)] = m.group(2)
+path = 'out/.config'
+lines = open(path).read().splitlines()
+seen = set()
+out = []
+for line in lines:
+    m = re.match(r'^# (CONFIG_[A-Za-z0-9_]+) is not set$', line)
+    if m and m.group(1) in wanted:
+        out.append('%s=%s' % (m.group(1), wanted[m.group(1)]))
+        seen.add(m.group(1))
+        continue
+    m2 = re.match(r'^(CONFIG_[A-Za-z0-9_]+)=', line)
+    if m2 and m2.group(1) in wanted:
+        seen.add(m2.group(1))
+        out.append('%s=%s' % (m2.group(1), wanted[m2.group(1)]))
+        continue
+    out.append(line)
+missing = [k + '=' + v for k, v in sorted(wanted.items()) if k not in seen]
+out.extend(missing)
+open(path, 'w').write(chr(10).join(out) + chr(10))
+print('fragment merged: flipped/kept %d, appended %d (%s)' % (len(seen), len(missing), [x.split('=')[0] for x in missing]))
+PYMERGE
 make "${MK[@]}" olddefconfig
+# Post-olddefconfig verification: fail fast if any fragment symbol did not stick.
+python3 - <<'PYVERIFY'
+import re, sys
+wanted = {}
+for line in open('.ci/droidspaces.config'):
+    m = re.match(r'^(CONFIG_[A-Za-z0-9_]+)=([ym])$', line.strip())
+    if m:
+        wanted[m.group(1)] = m.group(2)
+cur = {}
+for line in open('out/.config'):
+    m = re.match(r'^(CONFIG_[A-Za-z0-9_]+)=(.*)$', line.strip())
+    if m:
+        cur.setdefault(m.group(1), m.group(2))
+bad = [(k, cur.get(k, 'ABSENT')) for k, v in wanted.items() if cur.get(k) != v]
+if bad:
+    print('FRAGMENT NOT APPLIED:', bad)
+    sys.exit(1)
+print('fragment fully applied (%d symbols)' % len(wanted))
+PYVERIFY
+RC=$?
+if [ "$RC" != 0 ]; then echo "::error::fragment merge failed"; exit 1; fi
 echo "::endgroup::"
 echo "::group::audit key configs"
 FAIL=0
