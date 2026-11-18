@@ -10,6 +10,16 @@
 - **New mount API (`fsopen`/`fsconfig`)**: architecturally absent on 4.14
   (introduced in 5.2). systemd inside containers falls back to legacy syscalls;
   no functional impact observed.
+- **FCM3 VINTF kernel compliance**: the boot-time "device internal problem"
+  dialog is triggered by `Build.isBuildConsistent()` failing libvintf kernel
+  checks against `compatibility_matrix.3.xml`. Required and enforced by CI:
+  `CONFIG_AUDIT=y` (also restores avc-denied logging), `CONFIG_FHANDLE=n`
+  (note: FHANDLE is `default y` in kconfig, so it must be explicitly disabled
+  in crux_defconfig; a fragment cannot express =n). Restored for parity with
+  stock: PSTORE + CONSOLE/PMSG/RAM/ZLIB (ramoops crash forensics).
+  Not applicable to this tree (structurally absent or stock-off): DEVKMEM
+  (depends on !ARM64), SECURITY_PERF_EVENTS_RESTRICT (no such symbol),
+  KPTI/SSBD/errata mitigations (stock ships them off).
 
 ## CI note: kernel/Makefile IKCONFIG patch
 
