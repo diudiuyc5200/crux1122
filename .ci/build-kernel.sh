@@ -139,7 +139,8 @@ echo "::endgroup::"
 # builds). Replace with standard upstream recipe depending on .config.
 python3 - <<'PYMK'
 mk="kernel/Makefile"
-lines=open(mk).read().split("\\n")
+txt=open(mk).read()
+lines=txt.split("\n")
 out=[]; i=0; removed=0
 while i < len(lines):
     l=lines[i]
@@ -149,7 +150,16 @@ while i < len(lines):
             i+=1
         continue
     out.append(l); i+=1
-assert removed==3, "expected 3 stock rules, got %d" % removed
+print("stock rules removed:", removed)
+# drop any leftover droidspaces block from a previous patch pass (idempotency)
+clean=[]; skip=0
+for l in out:
+    if l.startswith("# --- droidspaces: upstream-style IKCONFIG chain"):
+        skip=6; continue
+    if skip>0:
+        skip-=1; continue
+    clean.append(l)
+out=clean
 TAB=chr(9)
 ti=[n for n,x in enumerate(out) if x.strip()=="targets += config_data.gz"][0]
 block=[
@@ -163,8 +173,8 @@ block=[
  "$(obj)/config_data.gz: $(obj)/config_data FORCE",
 ]
 out[ti+1:ti+1]=block
-open(mk,"w").write("\\n".join(out))
-print("kernel/Makefile patched, removed", removed, "stock rules")
+open(mk,"w").write("\n".join(out))
+print("kernel/Makefile patched")
 PYMK
 echo "::group::build Image.gz-dtb"
 # Debug: find which file carries the stock pre-baked config markers.
