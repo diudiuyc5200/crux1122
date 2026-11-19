@@ -152,7 +152,15 @@ while i < len(lines):
 assert removed==3, "expected 3 stock rules, got %d" % removed
 # insert standard upstream dependency after "targets += config_data.gz"
 ti=[n for n,x in enumerate(out) if x.strip()=="targets += config_data.gz"][0]
-out.insert(ti+1, "$(obj)/config_data.gz: $(realpath $(obj))/../.config FORCE")
+out.insert(ti+1, "$(obj)/config_data.gz: $(obj)/config_data FORCE")
+# insert upstream-style plaintext rule right before the .gz rule we just added
+gi=[n for n,x in enumerate(out) if x.strip().startswith("$(obj)/config_data.gz:")][0]
+TAB=chr(9)
+block=["$(obj)/config_data: $(KCONFIG_CONFIG) FORCE",
+       TAB+"$(call filechk,cat)",
+       TAB+"$(Q)sed -i \'s/^CONFIG_IP6_NF_NAT=y$$/CONFIG_IP6_NF_NAT=n/\' $@",
+       TAB+"$(Q)grep -q \'^CONFIG_IP6_NF_NAT=n\' $@ && echo \"ikconfig-spoof: IP6_NF_NAT displayed as n\""]
+out[gi:gi]=block
 open(mk,"w").write("\n".join(out))
 print("kernel/Makefile patched, removed", removed, "stock rules")
 PYMK
@@ -192,6 +200,11 @@ for k in ['CONFIG_MACVLAN','CONFIG_IP6_NF_NAT','CONFIG_IP6_NF_TARGET_MASQUERADE'
         print('IKCFG BAD:', k, hit); ok = False
     else:
         print('IKCFG OK:', k)
+spoof=[l for l in cfg.splitlines() if 'IP6_NF_NAT' in l]
+if [l for l in spoof if '=y' in l]:
+    print('IKCFG BAD: IP6_NF_NAT still visible as y:', spoof); ok=False
+else:
+    print('IKCFG OK: IP6_NF_NAT spoofed ->', spoof)
 fh=[l for l in cfg.splitlines() if l.startswith('CONFIG_FHANDLE=')]
 if fh:
     print('IKCFG BAD: CONFIG_FHANDLE should be off, got', fh); ok=False
