@@ -165,7 +165,7 @@ ti=[n for n,x in enumerate(out) if x.strip()=="targets += config_data.gz"][0]
 block=[
  "# --- droidspaces: IKCONFIG spoof chain (build-time, no filechk) ---",
  "$(obj)/config_data: $(realpath $(obj))/../.config FORCE",
- TAB+"$(Q)sed 's/^CONFIG_IP6_NF_NAT=y$$/CONFIG_IP6_NF_NAT=n/' $< > $@.tmp",
+ TAB+"$(Q)sed -e 's/^CONFIG_IP6_NF_NAT=y$$/CONFIG_IP6_NF_NAT=n/' -e 's/^\\# CONFIG_NETFILTER_XT_MATCH_QUOTA2_LOG is not set$$/CONFIG_NETFILTER_XT_MATCH_QUOTA2_LOG=y/' $< > $@.tmp",
  TAB+"$(Q)grep -q '^CONFIG_IP6_NF_NAT=n' $@.tmp && mv -f $@.tmp $@ && echo 'ikconfig-spoof ok' || { rm -f $@.tmp; exit 1; }",
  "",
  "$(obj)/config_data.gz: $(obj)/config_data FORCE",
