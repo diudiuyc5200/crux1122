@@ -151,11 +151,11 @@ while i < len(lines):
         continue
     out.append(l); i+=1
 print("stock rules removed:", removed)
-# drop any leftover droidspaces block from a previous patch pass (idempotency)
+# idempotency: drop previous droidspaces block (7 lines incl. header)
 clean=[]; skip=0
 for l in out:
     if l.startswith("# --- droidspaces: upstream-style IKCONFIG chain"):
-        skip=6; continue
+        skip=7; continue
     if skip>0:
         skip-=1; continue
     clean.append(l)
@@ -163,14 +163,13 @@ out=clean
 TAB=chr(9)
 ti=[n for n,x in enumerate(out) if x.strip()=="targets += config_data.gz"][0]
 block=[
- "# --- droidspaces: upstream-style IKCONFIG chain with vendor-symbol spoof ---",
- "filechk_cat = cat $$<",
- "",
+ "# --- droidspaces: IKCONFIG spoof chain (build-time, no filechk) ---",
  "$(obj)/config_data: $(realpath $(obj))/../.config FORCE",
- TAB+"$(call filechk,cat)",
- TAB+"$(Q)python3 $(srctree)/.ci/spoof_ikconfig.py $@",
+ TAB+"$(Q)sed 's/^CONFIG_IP6_NF_NAT=y$$/CONFIG_IP6_NF_NAT=n/' $< > $@.tmp",
+ TAB+"$(Q)grep -q '^CONFIG_IP6_NF_NAT=n' $@.tmp && mv -f $@.tmp $@ && echo 'ikconfig-spoof ok' || { rm -f $@.tmp; exit 1; }",
  "",
  "$(obj)/config_data.gz: $(obj)/config_data FORCE",
+ TAB+"$(call if_changed,gzip)",
 ]
 out[ti+1:ti+1]=block
 open(mk,"w").write("\n".join(out))
