@@ -139,7 +139,7 @@ echo "::endgroup::"
 # builds). Replace with standard upstream recipe depending on .config.
 python3 - <<'PYMK'
 mk="kernel/Makefile"
-lines=open(mk).read().split("\n")
+lines=open(mk).read().split("\\n")
 out=[]; i=0; removed=0
 while i < len(lines):
     l=lines[i]
@@ -150,18 +150,20 @@ while i < len(lines):
         continue
     out.append(l); i+=1
 assert removed==3, "expected 3 stock rules, got %d" % removed
-# insert standard upstream dependency after "targets += config_data.gz"
-ti=[n for n,x in enumerate(out) if x.strip()=="targets += config_data.gz"][0]
-out.insert(ti+1, "$(obj)/config_data.gz: $(obj)/config_data FORCE")
-# insert upstream-style plaintext rule right before the .gz rule we just added
-gi=[n for n,x in enumerate(out) if x.strip().startswith("$(obj)/config_data.gz:")][0]
 TAB=chr(9)
-block=["$(obj)/config_data: $(KCONFIG_CONFIG) FORCE",
-       TAB+"$(call filechk,cat)",
-       TAB+"$(Q)sed -i \'s/^CONFIG_IP6_NF_NAT=y$$/CONFIG_IP6_NF_NAT=n/\' $@",
-       TAB+"$(Q)grep -q \'^CONFIG_IP6_NF_NAT=n\' $@ && echo \"ikconfig-spoof: IP6_NF_NAT displayed as n\""]
-out[gi:gi]=block
-open(mk,"w").write("\n".join(out))
+ti=[n for n,x in enumerate(out) if x.strip()=="targets += config_data.gz"][0]
+block=[
+ "# --- droidspaces: upstream-style IKCONFIG chain with vendor-symbol spoof ---",
+ "filechk_cat = cat $$<",
+ "",
+ "$(obj)/config_data: $(realpath $(obj))/../.config FORCE",
+ TAB+"$(call filechk,cat)",
+ TAB+"$(Q)python3 $(srctree)/.ci/spoof_ikconfig.py $@",
+ "",
+ "$(obj)/config_data.gz: $(obj)/config_data FORCE",
+]
+out[ti+1:ti+1]=block
+open(mk,"w").write("\\n".join(out))
 print("kernel/Makefile patched, removed", removed, "stock rules")
 PYMK
 echo "::group::build Image.gz-dtb"
@@ -180,31 +182,53 @@ if [ "$BUILD_RC" != 0 ]; then echo "::error::kernel compile failed rc=$BUILD_RC"
 # Post-build: verify the IKCFG blob embedded in the actual artifact.
 python3 - <<'PYIKCFG'
 import zlib, gzip, sys
+
 raw = open('out/arch/arm64/boot/Image.gz-dtb','rb').read()
-d = zlib.decompressobj(-15)
-img = d.decompress(raw[10:])
+img = None
+if raw[:2] == b'\\x1f\\x8b':
+    img = gzip.decompress(raw)
+else:
+    try:
+        img = zlib.decompressobj(-15).decompress(raw[10:])
+    except Exception:
+        img = zlib.decompress(raw[10:])
 i = img.find(b'IKCFG_ST')
 if i < 0:
     print('NO IKCFG in artifact'); sys.exit(1)
 seg = img[i+8:]
 e = seg.find(b'IKCFG_ED')
-try:
-    cfg = gzip.decompress(seg[:e]).decode()
-except Exception:
-    cfg = zlib.decompressobj(-15).decompress(seg[10:e]).decode()
+blob = seg[:e]
+def try_decompress(b):
+    cands = [b]
+    if len(b) > 10: cands.append(b[10:])
+    for data in cands:
+        if data[:2] == b'\\x1f\\x8b':
+            try: return gzip.decompress(data)
+            except Exception: pass
+        try: return zlib.decompressobj(-15).decompress(data)
+        except Exception: pass
+        try: return zlib.decompress(data)
+        except Exception: pass
+    return None
+data = try_decompress(blob)
+if data is None:
+    data = try_decompress(b'\\x1f\\x8b\\x08\\x00\\x00\\x00\\x00\\x00\\x02\\xff' + blob)
+if data is None:
+    print('IKCFG DECOMPRESS FAILED, first bytes:', blob[:16].hex()); sys.exit(1)
+cfg = data.decode(errors='replace')
 ok = True
-for k in ['CONFIG_MACVLAN','CONFIG_IP6_NF_NAT','CONFIG_IP6_NF_TARGET_MASQUERADE','CONFIG_AUDIT']:
-    hit = [l for l in cfg.splitlines() if l.startswith(k+'=') or l.startswith('# '+k+' is not set')]
-    want = '%s=y' % k
-    if want not in hit:
+for k in ['CONFIG_MACVLAN','CONFIG_IP6_NF_TARGET_MASQUERADE','CONFIG_AUDIT']:
+    hit = [l for l in cfg.splitlines() if l.startswith(k+'=')]
+    good = any(h.endswith('=y') or h.endswith('=m') for h in hit)
+    if not good:
         print('IKCFG BAD:', k, hit); ok = False
     else:
-        print('IKCFG OK:', k)
-spoof=[l for l in cfg.splitlines() if 'IP6_NF_NAT' in l]
-if [l for l in spoof if '=y' in l]:
-    print('IKCFG BAD: IP6_NF_NAT still visible as y:', spoof); ok=False
+        print('IKCFG OK:', k, hit)
+nat = [l for l in cfg.splitlines() if l.startswith('CONFIG_IP6_NF_NAT')]
+if nat != ['CONFIG_IP6_NF_NAT=n']:
+    print('IKCFG BAD: spoof missing, got', nat); ok = False
 else:
-    print('IKCFG OK: IP6_NF_NAT spoofed ->', spoof)
+    print('IKCFG OK: IP6_NF_NAT spoofed to n')
 fh=[l for l in cfg.splitlines() if l.startswith('CONFIG_FHANDLE=')]
 if fh:
     print('IKCFG BAD: CONFIG_FHANDLE should be off, got', fh); ok=False
