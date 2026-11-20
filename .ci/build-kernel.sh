@@ -196,9 +196,22 @@ ti=[n for n,x in enumerate(out) if x.strip()=="targets += config_data.gz"][0]
 block=[
  "# --- droidspaces: IKCONFIG spoof chain (build-time, no filechk) ---",
  "$(obj)/config_data: $(realpath $(obj))/../.config FORCE",
- TAB+"$(Q)sed -e 's/^CONFIG_IP6_NF_NAT=y$$/CONFIG_IP6_NF_NAT=n/' $< > $@.tmp",
- TAB+"$(Q)grep -q '^CONFIG_IP6_NF_NAT=n' $@.tmp || { rm -f $@.tmp; exit 1; }",
- TAB+"$(Q)mv -f $@.tmp $@ && echo 'ikconfig-spoof ok'",
+ TAB+"$(Q)sed \\",
+ TAB+"  -e 's/^CONFIG_IP6_NF_NAT=y$$/CONFIG_IP6_NF_NAT=n/' \\",
+ TAB+"  -e 's/^CONFIG_SYSVIPC=y$$/CONFIG_SYSVIPC=n/' \\",
+ TAB+"  -e 's/^CONFIG_PM_AUTOSLEEP=y$$/CONFIG_PM_AUTOSLEEP=n/' \\",
+ TAB+"  -e 's/^CONFIG_NETFILTER_XT_MATCH_QTAGUID=y$$/# CONFIG_NETFILTER_XT_MATCH_QTAGUID is not set/' \\",
+ TAB+"  -e 's/^CONFIG_ANDROID_BINDER_DEVICES=\"\\(.*\\)\"$$/CONFIG_ANDROID_BINDER_DEVICES=\\1/' \\",
+ TAB+"  $< > $@.tmp",
+ TAB+"$(Q)printf '# CONFIG_DEBUG_RODATA is not set\\n# CONFIG_DEBUG_SET_MODULE_RONX is not set\\n# CONFIG_DEVKMEM is not set\\n# CONFIG_INET_LRO is not set\\n# CONFIG_OABI_COMPAT is not set\\n# CONFIG_NETFILTER_XT_MATCH_QTAGUID is not set\\n' >> $@.tmp",
+ TAB+"$(Q)sed -i \\",
+ TAB+"  -e 's/^# CONFIG_DEBUG_RODATA is not set$$/CONFIG_DEBUG_RODATA=y/' \\",
+ TAB+"  -e 's/^# CONFIG_DEBUG_SET_MODULE_RONX is not set$$/CONFIG_DEBUG_SET_MODULE_RONX=y/' \\",
+ TAB+"  $@.tmp",
+ TAB+"$(Q)for k in CONFIG_IP6_NF_NAT CONFIG_SYSVIPC CONFIG_PM_AUTOSLEEP CONFIG_DEBUG_RODATA; do grep -q \"^$$k=y$$\\|^$$k=n$$\\|^$$k=[^ ]\" $@.tmp || { rm -f $@.tmp; exit 1; }; done",
+ TAB+"$(Q)grep -q '^CONFIG_IP6_NF_NAT=n$$' $@.tmp || { rm -f $@.tmp; exit 1; }",
+ TAB+"$(Q)grep -q '^CONFIG_SYSVIPC=n$$' $@.tmp || { rm -f $@.tmp; exit 1; }",
+ TAB+"$(Q)mv -f $@.tmp $@ && echo 'ikconfig-spoof ok (VINTF hide list applied)'",
  "",
  "$(obj)/config_data.gz: $(obj)/config_data FORCE",
  TAB+"$(call if_changed,gzip)",
@@ -270,6 +283,36 @@ if nat != ['CONFIG_IP6_NF_NAT=n']:
     print('IKCFG BAD: spoof missing, got', nat); ok = False
 else:
     print('IKCFG OK: IP6_NF_NAT spoofed to n')
+
+# --- VINTF hide-list assertions (level-4 compatibility_matrix.4.xml) ---
+def expect(key, want):
+    global ok
+    lines = [l.strip() for l in cfg.splitlines() if l.strip().startswith(key + '=') or l.strip() == '# %s is not set' % key]
+    if want == 'n':
+        good = (lines == ['# %s is not set' % key]) or (lines == ['%s=n' % key])
+    elif want == 'y':
+        good = (lines == ['%s=y' % key])
+    else:
+        good = any(l.endswith(want) for l in lines)
+    if not good:
+        print('IKCFG BAD: %s want %s, got %s' % (key, want, lines)); ok = False
+    else:
+        print('IKCFG OK: %s -> %s' % (key, want))
+
+expect('CONFIG_SYSVIPC', 'n')
+expect('CONFIG_PM_AUTOSLEEP', 'n')
+expect('CONFIG_DEBUG_RODATA', 'y')
+expect('CONFIG_DEBUG_SET_MODULE_RONX', 'y')
+expect('CONFIG_DEVKMEM', 'n')
+expect('CONFIG_INET_LRO', 'n')
+expect('CONFIG_OABI_COMPAT', 'n')
+expect('CONFIG_NETFILTER_XT_MATCH_QTAGUID', 'n')
+binder = [l for l in cfg.splitlines() if l.startswith('CONFIG_ANDROID_BINDER_DEVICES=')]
+if binder != ['CONFIG_ANDROID_BINDER_DEVICES=binder,hwbinder,vndbinder']:
+    print('IKCFG BAD: BINDER_DEVICES quoted/unexpected:', binder); ok = False
+else:
+    print('IKCFG OK: ANDROID_BINDER_DEVICES unquoted')
+
 fh=[l for l in cfg.splitlines() if l.startswith('CONFIG_FHANDLE=')]
 if fh:
     print('IKCFG BAD: CONFIG_FHANDLE should be off, got', fh); ok=False
