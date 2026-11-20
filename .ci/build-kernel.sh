@@ -18,6 +18,30 @@ MK=(O=out ARCH=$ARCH
   LLVM=1 LLVM_IAS=1 CLANG_TRIPLE=aarch64-linux-gnu-
   CROSS_COMPILE=aarch64-linux-gnu-)
 cd "$KERNEL_DIR"
+echo "::group::apply Droidspaces non-GKI kernel patches"
+# Patch 01 (xt_qtaguid dev_get_stats) is N/A: this tree has no net/netfilter/xt_qtaguid.c
+# (CONFIG_ANDROID_PARANOID_NETWORK absent). Only patch 02 applies.
+PATCHDIR="$KERNEL_DIR/.ci/patches/non-GKI"
+if [ -d "$PATCHDIR" ]; then
+  for p in "$PATCHDIR"/*.patch; do
+    [ -e "$p" ] || continue
+    echo "--- applying $(basename "$p")"
+    if patch -p1 --forward --dry-run < "$p" >/dev/null 2>&1; then
+      patch -p1 --forward < "$p"
+    elif patch -p1 --forward --dry-run -R < "$p" >/dev/null 2>&1; then
+      echo "already applied, skipping"
+    else
+      echo "::error::patch $(basename "$p") failed to apply"; exit 1
+    fi
+  done
+else
+  echo "no patch dir, skipping"
+fi
+# Assertion: the cgroup NOPREFIX restore must be present in the compiled tree.
+grep -q 'CGRP_ROOT_NOPREFIX) && !(cft->flags & CFTYPE_NO_PREFIX)' kernel/cgroup/cgroup.c \
+  || { echo "::error::cgroup NOPREFIX patch missing"; exit 1; }
+echo "patch verification OK"
+echo "::endgroup::"
 echo "::group::clean source tree"
 make ARCH=$ARCH mrproper >/dev/null 2>&1 || true
 rm -rf out .config .config.old
@@ -124,7 +148,16 @@ for c in CONFIG_PID_NS CONFIG_USER_NS CONFIG_NET_NS \
          CONFIG_OVERLAY_FS CONFIG_CGROUP_DEVICE CONFIG_CGROUP_PIDS \
          CONFIG_NF_NAT CONFIG_QCOM_KGSL \
          CONFIG_SECCOMP_FILTER CONFIG_DEVTMPFS CONFIG_DEVTMPFS_MOUNT \
-         CONFIG_MACVLAN CONFIG_IP6_NF_NAT CONFIG_IP6_NF_TARGET_MASQUERADE; do
+         CONFIG_MACVLAN CONFIG_IP6_NF_NAT CONFIG_IP6_NF_TARGET_MASQUERADE \
+         CONFIG_BRIDGE CONFIG_BRIDGE_NETFILTER CONFIG_NETFILTER_ADVANCED \
+         CONFIG_SYSVIPC CONFIG_NAMESPACES CONFIG_FAIR_GROUP_SCHED CONFIG_CGROUP_NET_PRIO \
+         CONFIG_TMPFS_POSIX_ACL CONFIG_BLK_DEV_LOOP CONFIG_EXT4_FS CONFIG_FW_LOADER_USER_HELPER \
+         CONFIG_NF_CT_NETLINK CONFIG_NF_NAT_REDIRECT CONFIG_NF_NAT_MASQUERADE_IPV4 \
+         CONFIG_IP_ADVANCED_ROUTER CONFIG_IP_MULTIPLE_TABLES CONFIG_IPV6_MULTIPLE_TABLES \
+         CONFIG_IP6_NF_FILTER CONFIG_IP6_NF_TARGET_REJECT \
+         CONFIG_NETFILTER_XT_TARGET_TCPMSS CONFIG_NETFILTER_XT_MATCH_ADDRTYPE \
+         CONFIG_IP_SET CONFIG_IP_SET_HASH_IP CONFIG_IP_SET_HASH_NET CONFIG_NETFILTER_XT_SET \
+         CONFIG_DUMMY CONFIG_VETH CONFIG_TUN; do
     if grep -qE "^$c=[ym]" out/.config; then
         grep -E "^$c=" out/.config
     else
