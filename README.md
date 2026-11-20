@@ -39,11 +39,23 @@ Backup your stock boot.img first (`fastboot fetch boot` or from the factory imag
   checks against `compatibility_matrix.3.xml`. Required and enforced by CI:
   `CONFIG_AUDIT=y` (also restores avc-denied logging), `CONFIG_FHANDLE=n`
   (note: FHANDLE is `default y` in kconfig, so it must be explicitly disabled
-  in crux_defconfig; a fragment cannot express =n). Restored for parity with
-  stock: PSTORE + CONSOLE/PMSG/RAM/ZLIB (ramoops crash forensics).
+  in crux_defconfig; a fragment cannot express =n).
   Not applicable to this tree (structurally absent or stock-off): DEVKMEM
   (depends on !ARM64), SECURITY_PERF_EVENTS_RESTRICT (no such symbol),
   KPTI/SSBD/errata mitigations (stock ships them off).
+
+## PSTORE policy: permanently OFF (correcting an earlier claim)
+
+Stock's exposed config shows `PSTORE*/PSTORE_RAM=y`, but that line comes from
+Xiaomi's fake static `config_data.gz` — the *running* stock kernel has no
+pstore either (`/proc/filesystems` lacks pstore, `/sys/fs/pstore` empty).
+Enabling `CONFIG_PSTORE_RAM` on crux is proven to bootloop (v3 / Run #31,
+see Bootloop lessons) because the merged crux DTB carries no usable ramoops
+reservation (the base sm8150.dtsi `ramoops@a1600000` region collides with the
+`sdx50m` overlay's `pil_buffer_p1_region@a1000000+2C00000`). Do NOT add
+PSTORE back "for parity" — parity is already achieved by matching stock's
+*actual runtime behavior*. Crash forensics on this platform relies on
+QSEE minidumps, not Linux-side ramoops.
 
 ## The boot dialog ("device internal problem") — status: RESOLVED via stock-parity config
 
