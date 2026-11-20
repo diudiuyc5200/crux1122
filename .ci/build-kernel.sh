@@ -201,6 +201,7 @@ block=[
  TAB+"  -e 's/^CONFIG_SYSVIPC=y$$/CONFIG_SYSVIPC=n/' \\",
  TAB+"  -e 's/^CONFIG_PM_AUTOSLEEP=y$$/CONFIG_PM_AUTOSLEEP=n/' \\",
  TAB+"  -e 's/^CONFIG_NETFILTER_XT_MATCH_QTAGUID=y$$/# CONFIG_NETFILTER_XT_MATCH_QTAGUID is not set/' \\",
+ TAB+"  -e 's/^CONFIG_USB_RTL8152=y$$/# CONFIG_USB_RTL8152 is not set/' \\",
  TAB+"  -e 's/^CONFIG_ANDROID_BINDER_DEVICES=\"\\(.*\\)\"$$/CONFIG_ANDROID_BINDER_DEVICES=\\1/' \\",
  TAB+"  $< > $@.tmp",
  TAB+"$(Q)printf '# CONFIG_DEBUG_RODATA is not set\\n# CONFIG_DEBUG_SET_MODULE_RONX is not set\\n# CONFIG_DEVKMEM is not set\\n# CONFIG_INET_LRO is not set\\n# CONFIG_OABI_COMPAT is not set\\n# CONFIG_NETFILTER_XT_MATCH_QTAGUID is not set\\n' >> $@.tmp",
@@ -307,6 +308,7 @@ expect('CONFIG_DEVKMEM', 'n')
 expect('CONFIG_INET_LRO', 'n')
 expect('CONFIG_OABI_COMPAT', 'n')
 expect('CONFIG_NETFILTER_XT_MATCH_QTAGUID', 'n')
+expect('CONFIG_USB_RTL8152', 'n')
 binder = [l for l in cfg.splitlines() if l.startswith('CONFIG_ANDROID_BINDER_DEVICES=')]
 if binder != ['CONFIG_ANDROID_BINDER_DEVICES=binder,hwbinder,vndbinder']:
     print('IKCFG BAD: BINDER_DEVICES quoted/unexpected:', binder); ok = False
