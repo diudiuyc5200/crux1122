@@ -1,5 +1,12 @@
 menu "Kernel hardening options"
 
+config SECURITY_PERF_EVENTS_RESTRICT
+	bool "Restrict unprivileged use of performance events (compat stub)"
+	default n
+	help
+	  Symbol exists only to expose the config in /proc/config.gz;
+	  perf_event_paranoid default is set via cmdline androidperf.paranoid.
+
 menu "Memory initialization"
 
 choice

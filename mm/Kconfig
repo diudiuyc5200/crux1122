@@ -859,6 +859,13 @@ config PERCPU_STATS
 	  information includes global and per chunk statistics, which can
 	  be used to help understand percpu memory usage.
 
+config ANDROID_LOW_MEMORY_KILLER
+	bool "Android low memory killer (compat stub)"
+	default n
+	help
+	  Symbol exists only to expose the config in /proc/config.gz;
+	  actual LMK implementation lives in userspace (lmkd).
+
 config HAVE_LOW_MEMORY_KILLER
 	bool "Have user/kernel space low memory killer"
 	default n

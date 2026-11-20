@@ -41,6 +41,7 @@ obj-y			:= filemap.o mempool.o oom_kill.o \
 			   interval_tree.o list_lru.o workingset.o \
 			   debug.o $(mmu-y) showmem.o vmpressure.o
 
+obj-$(CONFIG_ANDROID_LOW_MEMORY_KILLER) += lowmemorykiller_compat.o
 obj-y += init-mm.o
 
 ifdef CONFIG_NO_BOOTMEM

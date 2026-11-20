@@ -149,25 +149,21 @@ while i < len(lines):
         while i < len(lines) and lines[i].strip()!="endif":
             i+=1
         continue
+    if l.startswith("# --- droidspaces:"):
+        j=i
+        while j < len(lines) and lines[j].strip()!="$(call if_changed,gzip)":
+            j+=1
+        i = j+1 if j < len(lines) else j
+        continue
     out.append(l); i+=1
 print("stock rules removed:", removed)
-# idempotency: drop previous droidspaces block (7 lines incl. header)
-clean=[]; skip=0
-for l in out:
-    if l.startswith("# --- droidspaces: upstream-style IKCONFIG chain"):
-        skip=7; continue
-    if skip>0:
-        skip-=1; continue
-    clean.append(l)
-out=clean
 TAB=chr(9)
 ti=[n for n,x in enumerate(out) if x.strip()=="targets += config_data.gz"][0]
 block=[
  "# --- droidspaces: IKCONFIG spoof chain (build-time, no filechk) ---",
  "$(obj)/config_data: $(realpath $(obj))/../.config FORCE",
- TAB+"$(Q)sed -e 's/^CONFIG_IP6_NF_NAT=y$$/CONFIG_IP6_NF_NAT=n/' -e 's/^\\# CONFIG_NETFILTER_XT_MATCH_QUOTA2_LOG is not set$$/CONFIG_NETFILTER_XT_MATCH_QUOTA2_LOG=y/' $< > $@.tmp",
-  TAB+"$(Q)grep -q '^CONFIG_IP6_NF_NAT=n' $@.tmp || { rm -f $@.tmp; exit 1; }",
- TAB+"$(Q)sed -i '$ a\\# CONFIG_ANDROID_LOW_MEMORY_KILLER is not set\\n# CONFIG_SECURITY_PERF_EVENTS_RESTRICT is not set' $@.tmp",
+ TAB+"$(Q)sed -e 's/^CONFIG_IP6_NF_NAT=y$$/CONFIG_IP6_NF_NAT=n/' $< > $@.tmp",
+ TAB+"$(Q)grep -q '^CONFIG_IP6_NF_NAT=n' $@.tmp || { rm -f $@.tmp; exit 1; }",
  TAB+"$(Q)mv -f $@.tmp $@ && echo 'ikconfig-spoof ok'",
  "",
  "$(obj)/config_data.gz: $(obj)/config_data FORCE",
@@ -245,6 +241,18 @@ if fh:
     print('IKCFG BAD: CONFIG_FHANDLE should be off, got', fh); ok=False
 else:
     print('IKCFG OK: CONFIG_FHANDLE off')
+q2=[l for l in cfg.splitlines() if l.startswith('CONFIG_NETFILTER_XT_MATCH_QUOTA2_LOG')]
+if q2 != ['CONFIG_NETFILTER_XT_MATCH_QUOTA2_LOG=y']:
+    print('IKCFG BAD: QUOTA2_LOG must be =y, got', q2); ok=False
+else:
+    print('IKCFG OK: QUOTA2_LOG=y')
+for k in ['CONFIG_ANDROID_LOW_MEMORY_KILLER','CONFIG_SECURITY_PERF_EVENTS_RESTRICT']:
+    hit=[l for l in cfg.splitlines() if l.startswith(k+'=')]
+    if hit != [k+'=y']:
+        print('IKCFG BAD: %s must be =y, got' % k, hit); ok=False
+    else:
+        print('IKCFG OK: %s=y' % k)
+print('IKCFG total lines:', len(cfg.splitlines()))
 sys.exit(0 if ok else 1)
 PYIKCFG
 IKRC=$?
