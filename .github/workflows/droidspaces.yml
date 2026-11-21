@@ -1,13 +1,9 @@
 name: Droidspaces Kernel (crux-marisa A16)
-
 on:
   workflow_dispatch:
-  push:
-    branches: [A16-droidspaces]
 
 env:
   DEBIAN_FRONTEND: noninteractive
-
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -16,36 +12,30 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-
       - name: Install toolchain deps
         run: |
           sudo apt-get update
           sudo apt-get install -y bison build-essential bc curl flex \
             libssl-dev libncurses5-dev python3 cpio xz-utils lz4 git
-
       - name: Setup proton-clang
         run: |
           mkdir -p "$HOME/kernel-build"
           git clone --depth=1 https://github.com/kdrag0n/proton-clang.git \
             "$HOME/kernel-build/proton-clang"
-
       - name: Symlink llvm tools into PATH (recordmcount needs llvm-objdump)
         run: |
           for t in "$HOME"/kernel-build/proton-clang/bin/llvm-*; do
             sudo ln -sf "$t" /usr/local/bin/"$(basename "$t")"
           done
           llvm-objdump --version | head -2 || true
-
       - name: Setup mkbootimg
         run: |
           git clone --depth=1 https://github.com/osm0sis/mkbootimg.git \
             "$HOME/kernel-build/mkbootimg"
           make -C "$HOME/kernel-build/mkbootimg" -j2
           "$HOME/kernel-build/mkbootimg/mkbootimg" --help 2>&1 | head -3 || true
-
       - name: Build
         run: bash .ci/build-kernel.sh
-
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         if: always()
