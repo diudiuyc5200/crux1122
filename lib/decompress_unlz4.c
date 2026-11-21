@@ -21,8 +21,6 @@
 
 #include <asm/unaligned.h>
 
-extern int LZ4_arm64_decompress_safe(const char* src, char* dst, int compressedSize, int dstCapacity, bool some_flag);
-
 /*
  * Note: Uncompressed chunk size is used in the compressor side
  * (userspace side for compression).
@@ -167,7 +165,7 @@ STATIC inline int INIT unlz4(u8 *input, long in_len,
 #else
 		dest_len = uncomp_chunksize;
 #if defined(CONFIG_ARM64) && defined(CONFIG_KERNEL_MODE_NEON)
-		ret = LZ4_decompress_safe(inp, outp, chunksize, dest_len);
+		ret = LZ4_arm64_decompress_safe(inp, outp, chunksize, dest_len, false);
 #else
 		ret = LZ4_decompress_safe(inp, outp, chunksize, dest_len);
 #endif
