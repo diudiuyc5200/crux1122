@@ -195,24 +195,19 @@ TAB=chr(9)
 ti=[n for n,x in enumerate(out) if x.strip()=="targets += config_data.gz"][0]
 block=[
  "# --- droidspaces: IKCONFIG spoof chain (build-time, no filechk) ---",
+ "# MINIMAL spoof: only symbols that REALLY EXIST and whose value must differ.",
+ "# Anything absent from the .config stays absent -- libvintf skips unknown keys,",
+ "# and fabricating '# CONFIG_X is not set' lines makes it compare them (v15/v16",
+ "# regression: PM_AUTOSLEEP reported n while matrix level 1/2 demands y).",
  "$(obj)/config_data: $(realpath $(obj))/../.config FORCE",
  TAB+"$(Q)sed \\",
- TAB+"  -e 's/^CONFIG_IP6_NF_NAT=y$$/CONFIG_IP6_NF_NAT=n/' \\",
  TAB+"  -e 's/^CONFIG_SYSVIPC=y$$/CONFIG_SYSVIPC=n/' \\",
- TAB+"  -e 's/^CONFIG_PM_AUTOSLEEP=y$$/CONFIG_PM_AUTOSLEEP=n/' \\",
- TAB+"  -e 's/^CONFIG_NETFILTER_XT_MATCH_QTAGUID=y$$/# CONFIG_NETFILTER_XT_MATCH_QTAGUID is not set/' \\",
  TAB+"  -e 's/^CONFIG_USB_RTL8152=y$$/# CONFIG_USB_RTL8152 is not set/' \\",
- TAB+"  -e 's/^CONFIG_ANDROID_BINDER_DEVICES=\"\\(.*\\)\"$$/CONFIG_ANDROID_BINDER_DEVICES=\\1/' \\",
  TAB+"  $< > $@.tmp",
- TAB+"$(Q)printf '# CONFIG_DEBUG_RODATA is not set\\n# CONFIG_DEBUG_SET_MODULE_RONX is not set\\n# CONFIG_DEVKMEM is not set\\n# CONFIG_INET_LRO is not set\\n# CONFIG_OABI_COMPAT is not set\\n# CONFIG_NETFILTER_XT_MATCH_QTAGUID is not set\\n' >> $@.tmp",
- TAB+"$(Q)sed -i \\",
- TAB+"  -e 's/^# CONFIG_DEBUG_RODATA is not set$$/CONFIG_DEBUG_RODATA=y/' \\",
- TAB+"  -e 's/^# CONFIG_DEBUG_SET_MODULE_RONX is not set$$/CONFIG_DEBUG_SET_MODULE_RONX=y/' \\",
- TAB+"  $@.tmp",
- TAB+"$(Q)for k in CONFIG_IP6_NF_NAT CONFIG_SYSVIPC CONFIG_PM_AUTOSLEEP CONFIG_DEBUG_RODATA; do grep -q \"^$$k=y$$\\|^$$k=n$$\\|^$$k=[^ ]\" $@.tmp || { rm -f $@.tmp; exit 1; }; done",
- TAB+"$(Q)grep -q '^CONFIG_IP6_NF_NAT=n$$' $@.tmp || { rm -f $@.tmp; exit 1; }",
  TAB+"$(Q)grep -q '^CONFIG_SYSVIPC=n$$' $@.tmp || { rm -f $@.tmp; exit 1; }",
- TAB+"$(Q)mv -f $@.tmp $@ && echo 'ikconfig-spoof ok (VINTF hide list applied)'",
+ TAB+"$(Q)grep -q '^# CONFIG_USB_RTL8152 is not set$$' $@.tmp || { rm -f $@.tmp; exit 1; }",
+ TAB+"$(Q)grep -q '^CONFIG_PM_AUTOSLEEP=y$$' $@.tmp || { rm -f $@.tmp; exit 1; }",
+ TAB+"$(Q)mv -f $@.tmp $@ && echo 'ikconfig-spoof ok (minimal: SYSVIPC + RTL8152 only)'",
  "",
  "$(obj)/config_data.gz: $(obj)/config_data FORCE",
  TAB+"$(call if_changed,gzip)",
@@ -280,12 +275,13 @@ for k in ['CONFIG_MACVLAN','CONFIG_IP6_NF_TARGET_MASQUERADE','CONFIG_AUDIT']:
     else:
         print('IKCFG OK:', k, hit)
 nat = [l for l in cfg.splitlines() if l.startswith('CONFIG_IP6_NF_NAT')]
-if nat != ['CONFIG_IP6_NF_NAT=n']:
-    print('IKCFG BAD: spoof missing, got', nat); ok = False
+if nat != ['CONFIG_IP6_NF_NAT=y']:
+    print('IKCFG BAD: IP6_NF_NAT should be untouched (=y), got', nat); ok = False
 else:
-    print('IKCFG OK: IP6_NF_NAT spoofed to n')
+    print('IKCFG OK: IP6_NF_NAT left alone (=y)')
 
-# --- VINTF hide-list assertions (level-4 compatibility_matrix.4.xml) ---
+# --- MINIMAL spoof assertions ---
+# Only two symbols are rewritten; everything else must stay exactly as compiled.
 def expect(key, want):
     global ok
     lines = [l.strip() for l in cfg.splitlines() if l.strip().startswith(key + '=') or l.strip() == '# %s is not set' % key]
@@ -301,14 +297,19 @@ def expect(key, want):
         print('IKCFG OK: %s -> %s' % (key, want))
 
 expect('CONFIG_SYSVIPC', 'n')
-expect('CONFIG_PM_AUTOSLEEP', 'n')
-expect('CONFIG_DEBUG_RODATA', 'y')
-expect('CONFIG_DEBUG_SET_MODULE_RONX', 'y')
-expect('CONFIG_DEVKMEM', 'n')
-expect('CONFIG_INET_LRO', 'n')
-expect('CONFIG_OABI_COMPAT', 'n')
-expect('CONFIG_NETFILTER_XT_MATCH_QTAGUID', 'n')
 expect('CONFIG_USB_RTL8152', 'n')
+expect('CONFIG_PM_AUTOSLEEP', 'y')     # must stay y: matrix level 1/2 demand y
+
+# symbols we deliberately do NOT fabricate: they must remain ABSENT
+for k in ['CONFIG_DEVKMEM', 'CONFIG_INET_LRO', 'CONFIG_OABI_COMPAT',
+          'CONFIG_DEBUG_RODATA', 'CONFIG_DEBUG_SET_MODULE_RONX',
+          'CONFIG_NETFILTER_XT_MATCH_QTAGUID']:
+    hit = [l.strip() for l in cfg.splitlines()
+           if l.strip().startswith(k + '=') or l.strip() == '# %s is not set' % k]
+    if hit:
+        print('IKCFG BAD: %s must stay ABSENT, got %s' % (k, hit)); ok = False
+    else:
+        print('IKCFG OK: %s absent (not fabricated)' % k)
 binder = [l for l in cfg.splitlines() if l.startswith('CONFIG_ANDROID_BINDER_DEVICES=')]
 if binder != ['CONFIG_ANDROID_BINDER_DEVICES=binder,hwbinder,vndbinder']:
     print('IKCFG BAD: BINDER_DEVICES quoted/unexpected:', binder); ok = False
