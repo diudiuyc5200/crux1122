@@ -58,6 +58,11 @@ module_param_named(
 #define BQ_CHARGE_FULL_SOC	9750
 #define BQ_RECHARGE_SOC		9900
 
+/* 低电保护阈值 */
+#define FG_SHUTDOWN_VOLT_MV	3400	/* 3.4V 才允许真正掉到 0% */
+#define FG_MIN_SOC_REPORT	15	/* 电压高于 3.4V 时最低显示 15% */
+#define FG_LOW_VOLT_HYST_MV	100	/* 100mV 迟滞，防止电压抖动 */
+
 #define PD_CHG_UPDATE_DELAY_US	20	/*20 sec*/
 
 enum bq_fg_reg_idx {
@@ -194,6 +199,9 @@ struct bq_fg_chip {
 	int fake_soc;
 	int fake_temp;
 	int fake_volt;
+	/* 新增：charge_full自定义覆盖变量 */
+	int custom_charge_full;
+	bool charge_full_override;
 
 	struct	delayed_work monitor_work;
 	struct power_supply *fg_psy;
@@ -222,6 +230,10 @@ struct bq_fg_chip {
 	int	cold_thermal_len;
 	bool	update_now;
 	bool	fast_mode;
+
+	/* 低电保护状态 */
+	bool	shutdown_latched;	/* 是否已经真正进入低电 */
+	int	last_volt_mv;		/* 上次电压，做迟滞用 */
 };
 
 #define bq_dbg(reason, fmt, ...)			\
@@ -232,6 +244,7 @@ struct bq_fg_chip {
 			pr_debug(fmt, ##__VA_ARGS__);	\
 	} while (0)
 
+static int fg_read_volt(struct bq_fg_chip *bq);
 static int bq_battery_soc_smooth_tracking(struct bq_fg_chip *chip,
 		int raw_soc, int soc, int temp, int curr);
 static int fg_get_raw_soc(struct bq_fg_chip *bq);
@@ -829,15 +842,49 @@ static int fg_read_rsoc(struct bq_fg_chip *bq)
 
 static int fg_read_system_soc(struct bq_fg_chip *bq)
 {
-	int soc, curr, temp, raw_soc;
+	int soc, curr, temp, raw_soc, volt;
 
-	soc = fg_read_rsoc(bq);
+	/* 调试用的 fake_soc 不参与钳制 */
+	if (bq->fake_soc > 0)
+		return bq->fake_soc;
+
+	soc     = fg_read_rsoc(bq);
 	raw_soc = fg_get_raw_soc(bq);
 
 	fg_read_current(bq, &curr);
 	temp = fg_read_temperature(bq);
 
 	soc = bq_battery_soc_smooth_tracking(bq, raw_soc, soc, temp, curr);
+
+	/*
+	 * 低电保护核心逻辑：
+	 * - 电压 <= 3.4V         -> 真正低电，soc 归 0，允许关机
+	 * - 电压 > 3.4V + 迟滞   -> 解除低电锁存
+	 * - soc < 15% 且未锁存    -> 强制显示 15%
+	 * - 其他                  -> 原样上报
+	 */
+	volt = fg_read_volt(bq);
+	bq->last_volt_mv = volt;
+
+	if (volt > 0 && volt <= FG_SHUTDOWN_VOLT_MV) {
+		if (!bq->shutdown_latched)
+			bq_dbg(PR_OEM, "batt real low: %dmV <= %dmV, force SOC 0\n",
+				volt, FG_SHUTDOWN_VOLT_MV);
+		bq->shutdown_latched = true;
+		return 0;
+	}
+
+	if (bq->shutdown_latched &&
+	    volt >= FG_SHUTDOWN_VOLT_MV + FG_LOW_VOLT_HYST_MV) {
+		bq_dbg(PR_OEM, "batt recovered: %dmV, release low latch\n", volt);
+		bq->shutdown_latched = false;
+	}
+
+	if (!bq->shutdown_latched && soc < FG_MIN_SOC_REPORT) {
+		bq_dbg(PR_OEM, "soc %d%% < %d%%, volt=%dmV, clamp to %d%%\n",
+			soc, FG_MIN_SOC_REPORT, volt, FG_MIN_SOC_REPORT);
+		return FG_MIN_SOC_REPORT;
+	}
 
 	return soc;
 }
@@ -1002,7 +1049,7 @@ static int fg_read_tte(struct bq_fg_chip *bq)
 
 	if (bq->regs[BQ_FG_REG_TTE] == INVALID_REG_ADDR) {
 		bq_dbg(PR_OEM, "Time To Empty not supported!\n");
-		return -EPERM;
+		return -ENODATA;
 	}
 
 	ret = fg_read_word(bq, bq->regs[BQ_FG_REG_TTE], &tte);
@@ -1083,6 +1130,14 @@ static int fg_get_batt_status(struct bq_fg_chip *bq)
 
 static int fg_get_batt_capacity_level(struct bq_fg_chip *bq)
 {
+	int volt = fg_read_volt(bq);
+
+	/* 电压还高于关机阈值，就绝不报 LOW / CRITICAL */
+	if (volt > FG_SHUTDOWN_VOLT_MV) {
+		if (bq->batt_fc)
+			return POWER_SUPPLY_CAPACITY_LEVEL_FULL;
+		return POWER_SUPPLY_CAPACITY_LEVEL_NORMAL;
+	}
 
 	if (bq->batt_fc)
 		return POWER_SUPPLY_CAPACITY_LEVEL_FULL;
@@ -1092,7 +1147,6 @@ static int fg_get_batt_capacity_level(struct bq_fg_chip *bq)
 		return POWER_SUPPLY_CAPACITY_LEVEL_CRITICAL;
 	else
 		return POWER_SUPPLY_CAPACITY_LEVEL_NORMAL;
-
 }
 
 static int fg_get_soc_decimal_rate(struct bq_fg_chip *bq)
@@ -1313,6 +1367,11 @@ static int fg_get_property(struct power_supply *psy, enum power_supply_property 
 		break;
 
 	case POWER_SUPPLY_PROP_CHARGE_FULL:
+	        /* 新增：优先读取自定义容量 */
+	        if (bq->charge_full_override) {
+			val->intval = bq->custom_charge_full;
+			break;
+		}
 		if (bq->old_hw) {
 			val->intval = 4050000;
 			break;
@@ -1363,13 +1422,8 @@ static int fg_get_property(struct power_supply *psy, enum power_supply_property 
 		val->intval *= 1000;
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
-		if (bq->old_hw) {
-			val->intval = 4450000;
+			val->intval = 4400000;
 			break;
-		}
-		val->intval = fg_read_charging_voltage(bq);
-		val->intval *= 1000;
-		break;
 	case POWER_SUPPLY_PROP_AUTHENTIC:
 		val->intval = bq->verify_digest_success;
 		break;
@@ -1439,6 +1493,14 @@ static int fg_set_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 		bq->fake_volt = val->intval;
 		break;
+	/* 新增 charge_full 写入分支 */
+	case POWER_SUPPLY_PROP_CHARGE_FULL:
+		if (val->intval >= 1000000 && val->intval <= 20000000) {
+			bq->custom_charge_full = val->intval;
+			bq->charge_full_override = true;
+			power_supply_changed(bq->fg_psy);
+		}
+		break;	
 	default:
 		return -EINVAL;
 	}
@@ -1460,6 +1522,8 @@ static int fg_prop_is_writeable(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_FASTCHARGE_MODE:
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX:
+	/* 标记charge_full可写 */
+	case POWER_SUPPLY_PROP_CHARGE_FULL:
 		ret = 1;
 		break;
 	default:
@@ -2024,6 +2088,11 @@ static int bq_fg_probe(struct i2c_client *client,
 	bq->fake_soc	= -EINVAL;
 	bq->fake_temp	= -EINVAL;
 	bq->fake_volt	= -EINVAL;
+	/* 自定义容量覆盖变量初始化 */
+	bq->charge_full_override = false;
+	bq->custom_charge_full = 0;
+	bq->shutdown_latched = false;
+	bq->last_volt_mv = 0;
 
 	if (bq->chip == BQ27Z561) {
 		regs = bq27z561_regs;
