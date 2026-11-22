@@ -21,7 +21,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            bc bison flex libssl-dev libelf-dev device-tree-compiler \
+            bc bison flex libssl-dev libelf-dev libyaml-dev device-tree-compiler \
             gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi make
 
       - name: Show toolchain versions
