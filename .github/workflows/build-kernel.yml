@@ -10,14 +10,31 @@ permissions:
 env:
   KNAME: Zundamon
   KVERNUM: "1.0"
+<<<<<<< HEAD
   KSTAGE: "rc2"
   # KernelSU-Next manager shipped beside the kernel; the kernel tree tracks
   # KSU_VERSION 32680 (KSU-Next), which needs a KSU-Next manager APK.
   KSU_MANAGER_URL: "https://github.com/KernelSU-Next/KernelSU-Next/releases/download/v3.4.2/KernelSU_Next_v3.4.2_33355-release.apk"
   KSU_MANAGER_FALLBACK_URL: "https://github.com/KernelSU-Next/KernelSU-Next/releases/download/v3.2.0/KernelSU_Next_v3.2.0_33129-release.apk"
+=======
+  KSTAGE: "rc3"
+  KV: "v1.0-rc3"
+  KLINE: "4.14.357"
+  # KernelSU-Next manager shipped beside the kernel. The kernel tree tracks
+  # KSU_VERSION 32680, and every manager declares MINIMAL_SUPPORTED_KERNEL:
+  #   v3.4.x -> 33188, v3.2.0 -> 33110, v3.1.0 -> 32310, v3.0.x -> 22000
+  # 32680 < 33110, so only v3.1.0 / v3.0.x managers accept this kernel.
+  KSU_MANAGER_URL: "https://github.com/KernelSU-Next/KernelSU-Next/releases/download/v3.1.0/KernelSU_Next_v3.1.0_33024-release.apk"
+  KSU_MANAGER_FALLBACK_URL: "https://github.com/KernelSU-Next/KernelSU-Next/releases/download/v3.0.1/KernelSU_Next_v3.0.1_32967-release.apk"
+>>>>>>> 848a5330dc75 (raphael 4.14: v1.0-rc3, docker flavour, readable minimum brightness)
 
 jobs:
   build:
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [standard, docker]
+    name: build-${{ matrix.variant }}
     runs-on: ubuntu-22.04
     timeout-minutes: 180
     steps:
@@ -41,7 +58,7 @@ jobs:
       - name: Show toolchain versions
         run: aarch64-linux-gnu-gcc --version | head -1
 
-      - name: Configure (raphael_defconfig)
+      - name: Configure (${{ matrix.variant }})
         run: |
           set -o pipefail
           mkdir -p out
@@ -51,6 +68,17 @@ jobs:
             DTC_EXT=dtc \
             raphael_defconfig 2>&1 | tee out.configure.log \
             || { echo "CONFIGURE FAILED"; exit 1; }
+          if [ "${{ matrix.variant }}" = "docker" ]; then
+            scripts/kconfig/merge_config.sh -m -O out arch/arm64/configs/raphael_docker.config
+            make -j"$(nproc)" O=out ARCH=arm64 \
+              CROSS_COMPILE=aarch64-linux-gnu- \
+              CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+              NO_YAML=1 \
+              DTC_EXT=dtc \
+              olddefconfig 2>&1 | tee -a out.configure.log \
+              || { echo "DOCKER CONFIG MERGE FAILED"; exit 1; }
+          fi
+          grep -E "CONFIG_(UTS_NS|PID_NS|NET_NS|USER_NS|CGROUP_PIDS|VETH|SECCOMP_FILTER)=" out/.config || true
 
       - name: Build Image and dtbs
         run: |
@@ -81,7 +109,7 @@ jobs:
           cp out/arch/arm64/boot/dts/qcom/*.dtb artifacts/ 2>/dev/null || true
           cp out/arch/arm64/boot/dts/qcom/*.dtbo artifacts/ 2>/dev/null || true
           cp out/arch/arm64/boot/dts/qcom/dtbo.img artifacts/ 2>/dev/null || true
-          cp out/.config artifacts/config-raphael 2>/dev/null || true
+          cp out/.config "artifacts/config-raphael-${{ matrix.variant }}" 2>/dev/null || true
           cp out/include/config/kernel.release artifacts/ 2>/dev/null || true
           cp out.build.log out.configure.log artifacts/ 2>/dev/null || true
           ls -lh artifacts
@@ -96,10 +124,14 @@ jobs:
 
       - name: Package AnyKernel3 flashable zip
         if: success()
+        env:
+          VARIANT: ${{ matrix.variant }}
         run: |
           KREL=$(cat out/include/config/kernel.release)
           KVER=${KREL%%-*}
-          ZIPNAME="${KNAME}-${KVER}-${KVERNUM}${KSTAGE:+-$KSTAGE}.zip"
+          SUFFIX=""
+          [ "$VARIANT" = "docker" ] && SUFFIX="-docker"
+          ZIPNAME="${KNAME}-${KVER}-${KV}${SUFFIX}.zip"
           echo "ZIPNAME=$ZIPNAME" >> "$GITHUB_ENV"
 
           curl -fsSL -o ak3.zip https://github.com/osm0sis/AnyKernel3/archive/refs/heads/master.zip
@@ -108,7 +140,7 @@ jobs:
 
           cat > ak3/anykernel.sh <<EOF
           properties() { '
-          kernel.string=${KNAME}-${KVER}-${KVERNUM}${KSTAGE:+-$KSTAGE} for Redmi K20 Pro (raphael), uname: ${KREL}
+          kernel.string=${KNAME}-${KVER}-${KV}${SUFFIX} for Redmi K20 Pro (raphael), uname: ${KREL}
           do.devicecheck=1
           do.modules=0
           do.systemless=0
@@ -167,29 +199,30 @@ jobs:
       - name: Verify flashable zip contents
         run: |
           set -e
-          ZIP=$(ls Zundamon-*.zip | head -1)
-          echo "== $ZIP =="
-          unzip -l "$ZIP"
-          unzip -l "$ZIP" | grep -qE ' Image$' || { echo "ERROR: Image missing in zip"; exit 1; }
-          unzip -l "$ZIP" | grep -q ' anykernel.sh$' || { echo "ERROR: anykernel.sh missing"; exit 1; }
-          unzip -l "$ZIP" | grep -q ' tools/ak3-core.sh$' || { echo "ERROR: tools/ak3-core.sh missing"; exit 1; }
-          if unzip -l "$ZIP" | grep -q ' KernelSU-Next.apk$'; then
-            echo "OK: KernelSU-Next.apk bundled in zip"
-          else
-            echo "WARNING: KernelSU-Next.apk not bundled (manager download failed)"
-          fi
-          if unzip -l "$ZIP" | grep -q ' dtbo.img$'; then
-            echo "WARNING: unexpected dtbo.img in zip"
-          else
-            echo "OK: no dtbo.img shipped (keeps ROM dtbo intact)"
-          fi
+          for ZIP in Zundamon-*.zip; do
+            echo "== $ZIP =="
+            unzip -l "$ZIP"
+            unzip -l "$ZIP" | grep -qE ' Image$' || { echo "ERROR: Image missing in $ZIP"; exit 1; }
+            unzip -l "$ZIP" | grep -q ' anykernel.sh$' || { echo "ERROR: anykernel.sh missing in $ZIP"; exit 1; }
+            unzip -l "$ZIP" | grep -q ' tools/ak3-core.sh$' || { echo "ERROR: tools/ak3-core.sh missing in $ZIP"; exit 1; }
+            if unzip -l "$ZIP" | grep -q ' KernelSU-Next.apk$'; then
+              echo "OK: KernelSU-Next.apk bundled in $ZIP"
+            else
+              echo "WARNING: KernelSU-Next.apk not bundled in $ZIP (manager download failed)"
+            fi
+            if unzip -l "$ZIP" | grep -q ' dtbo.img$'; then
+              echo "WARNING: unexpected dtbo.img in $ZIP"
+            else
+              echo "OK: no dtbo.img shipped (keeps ROM dtbo intact)"
+            fi
+          done
 
 >>>>>>> 2fc4b37ace8a (raphael 4.14: rc2 - DC dimming brightness fix, KernelSU-Next manager, auto release)
       - name: Upload flashable zip
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Zundamon-4.14.357-${{ env.KVERNUM }}-${{ env.KSTAGE }}
+          name: ${{ env.KNAME }}-${{ env.KLINE }}-${{ env.KV }}${{ matrix.variant == 'docker' && '-docker' || '' }}
           path: |
             Zundamon-*.zip
             Zundamon-*.zip.sha256
@@ -199,7 +232,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: raphael-4.14-image
+          name: raphael-4.14-image${{ matrix.variant == 'docker' && '-docker' || '' }}
           path: artifacts/
           if-no-files-found: warn
 
@@ -211,7 +244,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           {
-            echo "run: $GITHUB_RUN_ID  commit: $GITHUB_SHA"
+            echo "run: $GITHUB_RUN_ID  commit: $GITHUB_SHA  variant: ${{ matrix.variant }}"
             echo "=== configure (tail) ==="
             tail -40 out.configure.log 2>/dev/null
             echo "=== build: errors ==="
@@ -233,10 +266,20 @@ jobs:
     permissions:
       contents: write
     steps:
+<<<<<<< HEAD
       - name: Download flashable zip
+=======
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Download flashable zips (standard + docker)
+>>>>>>> 848a5330dc75 (raphael 4.14: v1.0-rc3, docker flavour, readable minimum brightness)
         uses: actions/download-artifact@v4
         with:
-          name: Zundamon-4.14.357-${{ env.KVERNUM }}-${{ env.KSTAGE }}
+          pattern: ${{ env.KNAME }}-${{ env.KLINE }}-${{ env.KV }}*
+          merge-multiple: true
           path: dist
 
       - name: Fetch KernelSU-Next managers
@@ -248,21 +291,37 @@ jobs:
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: v${{ env.KVERNUM }}-${{ env.KSTAGE }}-4.14
+          TAG: ${{ env.KV }}-4.14
         run: |
           set -e
           gh release delete "$TAG" --yes --cleanup-tag || true
           gh release create "$TAG" \
+<<<<<<< HEAD
             --title "Zundamon 4.14.357 ${{ env.KVERNUM }}-${{ env.KSTAGE }} (raphael / K20 Pro)" \
+=======
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Zundamon 4.14.357 ${{ env.KV }} (raphael / K20 Pro)" \
+>>>>>>> 848a5330dc75 (raphael 4.14: v1.0-rc3, docker flavour, readable minimum brightness)
             --prerelease \
-            --notes "Zundamon kernel for Redmi K20 Pro (raphael), 4.14.357, ${{ env.KSTAGE }}.
+            --notes "Zundamon kernel for Redmi K20 Pro (raphael), 4.14.357, ${{ env.KV }}.
 
-          uname: 4.14.357-Zundamon-${{ env.KVERNUM }}-${{ env.KSTAGE }}
+          uname: 4.14.357-Zundamon-${{ env.KV }}
 
+<<<<<<< HEAD
           - Zundamon-4.14.357-${{ env.KVERNUM }}-${{ env.KSTAGE }}.zip: AnyKernel3 flashable zip (Image only, keeps your ROM dtbo).
           - KernelSU-Next-v3.4.2.apk: manager matching the built-in KernelSU (KSU-Next). Try this first.
           - KernelSU-Next-v3.2.0.apk: fallback manager if 3.4.2 reports an unsupported kernel.
           - The flashable zip also copies the manager to /sdcard/Download/Zundamon/; install it after boot.
+=======
+          - Zundamon-4.14.357-${{ env.KV }}.zip: AnyKernel3 flashable zip, standard flavour (Image only, keeps your ROM dtbo).
+          - Zundamon-4.14.357-${{ env.KV }}-docker.zip: same kernel with Docker/container support (UTS/IPC/PID/NET/USER namespaces, cgroup pids/device, veth/bridge/vxlan + NAT, overlayfs, seccomp filters).
+          - KernelSU-Next-v3.1.0.apk: manager matching this kernel (MINIMAL_SUPPORTED_KERNEL 32310 < 32680). Use this one.
+          - KernelSU-Next-v3.0.1.apk: older fallback (MINIMAL_SUPPORTED_KERNEL 22000).
+          - Do not use 3.2.0+ managers: they require kernel >= 33110 and will report an unsupported kernel.
+          - Both zips' anykernel.sh copies the manager to /sdcard/Download/Zundamon/; install it after boot.
+
+          Changes in this build: lowest brightness raised from 2 to 60 (~3%), so the dimmest step is no longer near-black. Version string now carries the v prefix.
+>>>>>>> 848a5330dc75 (raphael 4.14: v1.0-rc3, docker flavour, readable minimum brightness)
 
           Backup boot/dtbo before flashing." \
             dist/*.zip dist/*.sha256 dist/*.apk

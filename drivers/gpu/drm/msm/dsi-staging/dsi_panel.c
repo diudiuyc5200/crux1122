@@ -866,6 +866,17 @@ int dsi_panel_set_backlight(struct dsi_panel *panel, u32 bl_lvl)
 	} else
 		bl_temp = bl_lvl;
 
+	/*
+	 * Keep the lowest step readable instead of near-black: honour the panel's
+	 * configured minimum (raphael DT: qcom,mdss-dsi-bl-min-level) for any
+	 * non-zero request. Brightness 0 (screen off / AOD) is left untouched.
+	 */
+	if (bl_temp && bl->bl_min_level && bl_temp < bl->bl_min_level) {
+		pr_debug("raising backlight %u to panel minimum %u\n",
+			 bl_temp, bl->bl_min_level);
+		bl_temp = bl->bl_min_level;
+	}
+
 	if (panel->fod_dimlayer_bl_block && bl_temp != 0) {
 		panel->last_bl_lvl = bl_temp;
 		pr_info("skip set backlight due to dim layer block\n");

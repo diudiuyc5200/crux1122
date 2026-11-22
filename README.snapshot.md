@@ -33,15 +33,23 @@ Redmi K20 Pro / Mi 9T Pro（代号 **raphael**，SM8150）的 4.14 第三方内�
 9. **DC 调光把低亮度锁死**（rc2，待真机确认）
    - `drivers/gpu/drm/msm/dsi-staging/dsi_panel.c`：DC 调光（`DISPPARAM_DC_ON` / `DISPPARAM_DC_LAYER_ON`）打开后，低于 `dc_threshold`（raphael 是 610/2047）的背光请求会被 **整条丢弃**（`skip set backlight bacase dc enable`），或**钉死在 dc_threshold**。Xiaomi 原本靠显示处理器在底层压暗画面；部分第三方 ROM（如移植的澎湃 OS 3）只打开了 DC 图层却没做画面压暗，于是亮度条在低段完全没反应、屏幕停在 ~30%。
    - 现在改成：DC 地板默认关闭，背光始终按请求值下发（DC 图层命令 `DIMMINGON/OFF` 仍照发）。需要恢复 Xiaomi 老行为时，给面板节点加 `qcom,mdss-dsi-panel-dc-floor-enable;` 即可。
+10. **最低亮度接近全黑**（rc3）
+   - `arch/arm64/boot/dts/qcom/xiaomi-sm8150-common.dtsi` 的 `qcom,mdss-dsi-bl-min-level` 从 `<2>` 提到 `<60>`（2047 的约 3%）。
+   - `drivers/gpu/drm/msm/dsi-staging/dsi_panel.c` 的 `dsi_panel_set_backlight()` 对任何非零 `bl_temp` 钳制到 `bl_min_level`；`0` 仍是 `0`，关屏/AOD 不受影响。觉得还暗就继续调这个 60。
 
 ## 版本与产物
 
-- 版本串：`CONFIG_LOCALVERSION="-Zundamon-1.0-rc2"` 且去掉了 `Makefile` 里的 `EXTRAVERSION = -openela`，`uname -r` 为 **`4.14.357-Zundamon-1.0-rc2`**。
-- 刷机包：`Zundamon-4.14.357-1.0-rc2.zip`（AnyKernel3，只替换 boot 内 kernel，不含 dtbo.img），artifact 名 `Zundamon-4.14.357-1.0-rc2`，同目录有 `.sha256`。
-- 命名规则 `Zundamon-<内核版本>-<版本号>[-rcN]`，由 workflow 顶部 `KNAME/KVERNUM/KSTAGE` 控制。
+- 版本串：`CONFIG_LOCALVERSION="-Zundamon-v1.0-rc3"`（`1.0` 前带 `v`）且去掉了 `Makefile` 里的 `EXTRAVERSION = -openela`，`uname -r` 为 **`4.14.357-Zundamon-v1.0-rc3`**。
+- 每次 CI 出两种口味：
+  - `Zundamon-4.14.357-v1.0-rc3.zip`——标准版；
+  - `Zundamon-4.14.357-v1.0-rc3-docker.zip`——同内核 + Docker/容器支持；
+  - 都是 AnyKernel3，只替换 boot 内 kernel，不含 dtbo.img，同目录有 `.sha256`。
+- Docker 版是在 `raphael_defconfig` 上再叠 `arch/arm64/configs/raphael_docker.config`：UTS/IPC/PID/NET/USER 命名空间、cgroup pids/device、veth/macvlan/vxlan/bridge + iptables NAT、overlayfs、seccomp filter。标准版不启用这些（尤其 `USER_NS` 会扩大攻击面），两个包互不影响。
+- 命名规则 `Zundamon-<内核版本>-<版本号>[-docker]`，由 workflow 顶部 `KNAME/KV` 控制。
 
 ## Releases 与 root 管理器
 
+<<<<<<< HEAD
 - `main` 分支构建成功后，workflow 里的 `release` job 会用 Actions 自带的 `GITHUB_TOKEN` 自动创建/更新 **prerelease** `v1.0-rc2-4.14`，资产包括：
   - `Zundamon-4.14.357-1.0-rc2.zip` + `.sha256`；
   - `KernelSU-Next-v3.4.2.apk`（首选）；
@@ -49,6 +57,16 @@ Redmi K20 Pro / Mi 9T Pro（代号 **raphael**，SM8150）的 4.14 第三方内�
 - 内核里的 KernelSU 是 **KernelSU-Next**（`drivers/staging/kernelsu/Makefile:11` `KSU_VERSION=32680`，`KSU_EXPECTED_HASH=c371061b…`），所以管理器必须用 KSU-Next 的 APK，不能装原版 KernelSU。
 - 刷机包内也放了一份 `KernelSU-Next.apk`，`anykernel.sh` 刷完会把管理器拷到 `/sdcard/Download/Zundamon/KernelSU-Next.apk`。恢复模式里没法静默执行 `pm install`，所以**重启后需要手动点一下这个 APK 安装**。
 - 管理器版本比内核新是正常的（管理器向下兼容旧内核）；若提示“内核版本过低”，装 Release 里的 v3.2.0 那个。
+=======
+- `main` 分支构建成功后，workflow 里的 `release` job 会用 Actions 自带的 `GITHUB_TOKEN` 自动创建/更新 **prerelease** `v1.0-rc3-4.14`，资产包括：
+  - `Zundamon-4.14.357-v1.0-rc3.zip` / `Zundamon-4.14.357-v1.0-rc3-docker.zip` + `.sha256`；
+  - `KernelSU-Next-v3.1.0.apk`（首选，`MINIMAL_SUPPORTED_KERNEL=32310`）；
+  - `KernelSU-Next-v3.0.1.apk`（更老的回退，`MINIMAL_SUPPORTED_KERNEL=22000`）。
+- 内核里的 KernelSU 是 **KernelSU-Next**（`drivers/staging/kernelsu/Makefile:11` `KSU_VERSION=32680`），所以管理器必须用 KSU-Next 的 APK，不能装原版 KernelSU。
+- 管理器版本要**压着内核版本选**：每个 KSU-Next 管理器在 `Natives.kt` 里写死了 `MINIMAL_SUPPORTED_KERNEL`——v3.4.x 需要 33188、v3.2.0 需要 33110、v3.1.0 需要 32310、v3.0.x 需要 22000。本内核是 32680，所以 **3.2.0 及更新的管理器都会提示“内核版本不受支持”**，只能用 3.1.0（或更老）。这就是第一个 Release 里 3.4.2 装不上的原因。
+- 另一个坑是 **v2 签名白名单**：`manager/apk_sign.c:322` 用 `KSU_EXPECTED_SIZE/HASH` 校验管理器 APK 的签名证书。上游这棵树原先带的是 tiann/KernelSU 的默认值（`me.weishu.kernelsu`、827 字节证书、`c371061b…`），而官方 KSU-Next APK 的证书是 998 字节、`79e59011…`，所以任何官方 KSU-Next 管理器都会报“无法在内核找到v2签名”。现在已把常量改成 KSU-Next 的发布签名（`0x03e6` / `79e59011…` / 包名 `com.rifsxd.ksunext`）。
+- 刷机包内也放了一份 `KernelSU-Next.apk`（即 3.1.0），`anykernel.sh` 刷完会把管理器拷到 `/sdcard/Download/Zundamon/KernelSU-Next.apk`。恢复模式里没法静默执行 `pm install`，所以**重启后需要手动点一下这个 APK 安装**。
+>>>>>>> 848a5330dc75 (raphael 4.14: v1.0-rc3, docker flavour, readable minimum brightness)
 
 ## CI 构建链（这段是踩坑记录）
 
