@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -62,3 +65,26 @@ jobs:
           name: raphael-4.14-image
           path: artifacts/
           if-no-files-found: warn
+
+      # Publish the failing log to a branch so it can be inspected without
+      # authenticated artifact access.
+      - name: Publish failure log to branch
+        if: failure()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "run: $GITHUB_RUN_ID  commit: $GITHUB_SHA"
+            echo "=== configure (tail) ==="
+            tail -40 out.configure.log 2>/dev/null
+            echo "=== build: errors ==="
+            grep -nE "error:|Error [0-9]|No rule to make|undefined reference|fatal error" out.build.log 2>/dev/null | tail -60
+            echo "=== build (tail) ==="
+            tail -120 out.build.log 2>/dev/null
+          } > ci-build-failure.log
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B ci-logs
+          git add -f ci-build-failure.log
+          git commit -m "ci: build failure log (run $GITHUB_RUN_ID)" || true
+          git push --force origin ci-logs
