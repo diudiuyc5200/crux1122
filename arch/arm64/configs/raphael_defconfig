@@ -1,7 +1,11 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 CONFIG_LOCALVERSION="-XTurbo-v2.9"
 =======
 CONFIG_LOCALVERSION="-Zundamon-1.0-rc1"
+=======
+CONFIG_LOCALVERSION="-Zundamon-1.0-rc2"
+>>>>>>> 2fc4b37ace8a (raphael 4.14: rc2 - DC dimming brightness fix, KernelSU-Next manager, auto release)
 # CONFIG_LOCALVERSION_AUTO is not set
 >>>>>>> e186a347377e (raphael 4.14: seamless disable balance; release naming 1.0-rc1 + AnyKernel3 zip)
 # CONFIG_FHANDLE is not set

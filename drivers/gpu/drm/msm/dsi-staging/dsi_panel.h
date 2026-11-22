@@ -298,6 +298,8 @@ struct dsi_panel {
 	u32 dc_threshold;
 	bool dc_enable;
 	bool dim_layer_replace_dc;
+	/* keep the DC-dimming backlight floor (legacy Xiaomi behaviour) */
+	bool dc_floor_enable;
 	bool fod_dimlayer_bl_block;
 	bool fodflag;
 	int power_mode;
