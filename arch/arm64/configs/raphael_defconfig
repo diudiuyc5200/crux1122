@@ -1,6 +1,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 CONFIG_LOCALVERSION="-XTurbo-v2.9"
 =======
 CONFIG_LOCALVERSION="-Zundamon-1.0-rc1"
@@ -10,6 +11,9 @@ CONFIG_LOCALVERSION="-Zundamon-1.0-rc2"
 =======
 CONFIG_LOCALVERSION="-Zundamon-v1.0-rc3"
 >>>>>>> 848a5330dc75 (raphael 4.14: v1.0-rc3, docker flavour, readable minimum brightness)
+=======
+CONFIG_LOCALVERSION="-Zundamon-v1.0-rc5"
+>>>>>>> 1bc53f95e22d (raphael 4.14: v1.0-rc5, DC dimming drives the dim layer, NFC power-on diagnostics)
 # CONFIG_LOCALVERSION_AUTO is not set
 >>>>>>> e186a347377e (raphael 4.14: seamless disable balance; release naming 1.0-rc1 + AnyKernel3 zip)
 # CONFIG_FHANDLE is not set

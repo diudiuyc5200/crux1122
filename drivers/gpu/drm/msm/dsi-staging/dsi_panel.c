@@ -5371,11 +5371,19 @@ static int panel_disp_param_send_lock(struct dsi_panel *panel, int param)
 		if (!panel->dim_layer_replace_dc) {
 			pr_info("DC on\n");
 			panel->dc_enable = true;
+			/*
+			 * The DC dimming layer is what actually lowers the
+			 * perceived brightness while DC mode is on.  Without
+			 * this the flag was only latched and nothing consumed
+			 * it, so toggling DC in the UI had no visible effect.
+			 */
+			panel->dc_dimming_enabled = true;
 		}
 		break;
 	case DISPPARAM_DC_OFF:
 		pr_info("DC off\n");
 		panel->dc_enable = false;
+		panel->dc_dimming_enabled = false;
 		panel->crc_flag = true;
 		break;
 	case DISPPARAN_FOD_FLAG:

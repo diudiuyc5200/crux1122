@@ -618,6 +618,15 @@ int nfc_ioctl_power_states(struct file *filp, unsigned long arg)
 				dev_err(&nqx_dev->client->dev, "unable to enable clock\n");
 		}
 		nqx_dev->nfc_ven_enabled = true;
+
+		/* one-shot diagnostics: makes "NFC does not react" debuggable */
+		pr_info("nq-nci: powered on ven=%d firm=%d irq=%d clk_vote=%d chip=0x%x\n",
+			gpio_get_value(nqx_dev->en_gpio),
+			gpio_is_valid(nqx_dev->firm_gpio) ?
+				gpio_get_value(nqx_dev->firm_gpio) : -1,
+			gpio_get_value(nqx_dev->irq_gpio),
+			nqx_dev->pdata->clk_pin_voting,
+			nqx_dev->nqx_info.info.chip_type);
 	} else if (arg == 2) {
 		/*
 		 * We are switching to Dowload Mode, toggle the enable pin

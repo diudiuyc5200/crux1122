@@ -11,6 +11,7 @@ env:
   KNAME: Zundamon
   KVERNUM: "1.0"
 <<<<<<< HEAD
+<<<<<<< HEAD
   KSTAGE: "rc2"
   # KernelSU-Next manager shipped beside the kernel; the kernel tree tracks
   # KSU_VERSION 32680 (KSU-Next), which needs a KSU-Next manager APK.
@@ -19,6 +20,10 @@ env:
 =======
   KSTAGE: "rc3"
   KV: "v1.0-rc3"
+=======
+  KSTAGE: "rc5"
+  KV: "v1.0-rc5"
+>>>>>>> 1bc53f95e22d (raphael 4.14: v1.0-rc5, DC dimming drives the dim layer, NFC power-on diagnostics)
   KLINE: "4.14.357"
   # KernelSU-Next manager shipped beside the kernel. The kernel tree tracks
   # KSU_VERSION 32680, and every manager declares MINIMAL_SUPPORTED_KERNEL:
@@ -320,8 +325,12 @@ jobs:
           - Do not use 3.2.0+ managers: they require kernel >= 33110 and will report an unsupported kernel.
           - Both zips' anykernel.sh copies the manager to /sdcard/Download/Zundamon/; install it after boot.
 
+<<<<<<< HEAD
           Changes in this build: lowest brightness raised from 2 to 60 (~3%), so the dimmest step is no longer near-black. Version string now carries the v prefix.
 >>>>>>> 848a5330dc75 (raphael 4.14: v1.0-rc3, docker flavour, readable minimum brightness)
+=======
+          Changes in v1.0-rc5: DC dimming now actually drives the SDE dim layer when the ROM switches it on (DISPPARAM_DC_ON/OFF previously only latched a flag nobody consumed, so toggling it did nothing), and the NFC driver now logs ven/firm/irq/clock state at power-on so a silent NFC can be diagnosed from dmesg. Includes v1.0-rc4 changes: bundled manager switched to backslashxx/KernelSU v3.3.1 build 32680 (exact kernel match) with the matching certificate whitelist.
+>>>>>>> 1bc53f95e22d (raphael 4.14: v1.0-rc5, DC dimming drives the dim layer, NFC power-on diagnostics)
 
           Backup boot/dtbo before flashing." \
             dist/*.zip dist/*.sha256 dist/*.apk
