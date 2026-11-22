@@ -22,7 +22,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             bc bison flex libssl-dev libelf-dev device-tree-compiler \
-            gcc-aarch64-linux-gnu make
+            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi make
 
       - name: Show toolchain versions
         run: aarch64-linux-gnu-gcc --version | head -1
@@ -33,6 +33,7 @@ jobs:
           mkdir -p out
           make -j"$(nproc)" O=out ARCH=arm64 \
             CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
             DTC_EXT=dtc \
             raphael_defconfig 2>&1 | tee out.configure.log \
             || { echo "CONFIGURE FAILED"; exit 1; }
@@ -42,6 +43,7 @@ jobs:
           set -o pipefail
           make -j"$(nproc)" O=out ARCH=arm64 \
             CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
             DTC_EXT=dtc \
             Image dtbs 2>&1 | tee out.build.log \
             || { echo "BUILD FAILED"; exit 1; }

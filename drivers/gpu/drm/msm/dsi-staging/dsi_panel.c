@@ -3734,13 +3734,16 @@ int dsi_panel_esd_irq_ctrl(struct dsi_panel *panel,
 		if (esd_config->esd_err_irq) {
 			if (enable) {
 				desc = irq_to_desc(esd_config->esd_err_irq);
-				if (!irq_settings_is_level(desc))
+				if (desc && !irq_settings_is_level(desc))
 					desc->istate &= ~IRQS_PENDING;
 				enable_irq(esd_config->esd_err_irq);
 				pr_info("panel esd irq is enable\n");
 			} else {
-				disable_irq_nosync(esd_config->esd_err_irq);
-				pr_info("panel esd irq is disable\n");
+				irq_data = irq_get_irq_data(esd_config->esd_err_irq);
+				if (irq_data && !irqd_irq_disabled(irq_data)) {
+					disable_irq_nosync(esd_config->esd_err_irq);
+					pr_info("panel esd irq is disable\n");
+				}
 			}
 		}
 	}

@@ -4482,7 +4482,7 @@ static int fg_psy_get_property(struct power_supply *psy,
 	struct fg_dev *fg = &chip->fg;
 	int rc = 0, val;
 	int64_t temp;
-	int vbatt_uv;
+	int vbatt_uv = 0;
 	static bool shutdown_delay_cancel;
 	static bool last_shutdown_delay;
 
@@ -4496,7 +4496,7 @@ static int fg_psy_get_property(struct power_supply *psy,
 		if (chip->dt.shutdown_delay_enable) {
 			if (pval->intval == 0) {
 				rc = fg_get_battery_voltage(fg, &vbatt_uv);
-				if (vbatt_uv/1000 > SHUTDOWN_DELAY_VOL
+				if (!rc && vbatt_uv/1000 > SHUTDOWN_DELAY_VOL
 					&& fg->charge_status != POWER_SUPPLY_STATUS_CHARGING) {
 					fg->shutdown_delay = true;
 					pval->intval = 1;
