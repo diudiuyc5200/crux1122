@@ -1,6 +1,14 @@
 #ifndef __LINUX_COMPILER_TYPES_H
 #define __LINUX_COMPILER_TYPES_H
 
+/*
+ * The preprocessor used for .S/.lds files does not necessarily provide
+ * __has_attribute(); fall back to "unsupported" instead of a syntax error.
+ */
+#ifndef __has_attribute
+# define __has_attribute(x) 0
+#endif
+
 #ifndef __ASSEMBLY__
 
 #ifdef __CHECKER__
