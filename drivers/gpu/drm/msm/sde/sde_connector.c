@@ -2915,6 +2915,9 @@ void sde_connector_dc_get_current_backlight(struct drm_connector *connector, uin
 	struct dsi_display *display = NULL;
 	struct dsi_bridge *c_bridge = NULL;
 
+	if (brightness)
+		*brightness = 0;
+
 	if (!connector || !connector->encoder || !connector->encoder->bridge) {
 		SDE_ERROR("Invalid connector/encoder/bridge ptr\n");
 		return;

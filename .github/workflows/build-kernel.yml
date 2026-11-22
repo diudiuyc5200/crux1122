@@ -1,7 +1,6 @@
 name: build-raphael-4.14
 
 on:
-  push:
   workflow_dispatch:
 
 permissions:
@@ -10,6 +9,7 @@ permissions:
 env:
   KNAME: Zundamon
   KVERNUM: "1.0"
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
   KSTAGE: "rc2"
@@ -24,6 +24,10 @@ env:
   KSTAGE: "rc5"
   KV: "v1.0-rc5"
 >>>>>>> 1bc53f95e22d (raphael 4.14: v1.0-rc5, DC dimming drives the dim layer, NFC power-on diagnostics)
+=======
+  KSTAGE: "rc6"
+  KV: "v1.0-rc6"
+>>>>>>> 7fdbfe569b11 (raphael 4.14: v1.0-rc6, panic timeout 5s, display save/restore logs, DC brightness init)
   KLINE: "4.14.357"
   # KernelSU-Next manager shipped beside the kernel. The kernel tree tracks
   # KSU_VERSION 32680, and every manager declares MINIMAL_SUPPORTED_KERNEL:
