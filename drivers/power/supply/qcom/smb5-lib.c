@@ -6950,6 +6950,8 @@ static void smblib_raise_qc3_vbus_work(struct work_struct *work)
 			chg->is_qc_class_a = true;
 			vote(chg->fcc_votable,
 					CLASSA_QC_FCC_VOTER, true, QC_CLASS_A_CURRENT_UA);
+			if (chg->usb_psy)
+				power_supply_changed(chg->usb_psy);
 		} else {
 			pr_info("qc_class_b charger is detected\n");
 			chg->is_qc_class_b = true;

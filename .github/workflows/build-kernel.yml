@@ -1,0 +1,92 @@
+name: build-raphael-4.14
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison flex libssl-dev libelf-dev device-tree-compiler \
+            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi make
+
+      - name: Show toolchain versions
+        run: aarch64-linux-gnu-gcc --version | head -1
+
+      - name: Configure (raphael_defconfig)
+        run: |
+          set -o pipefail
+          mkdir -p out
+          make -j"$(nproc)" O=out ARCH=arm64 \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            DTC_EXT=dtc \
+            raphael_defconfig 2>&1 | tee out.configure.log \
+            || { echo "CONFIGURE FAILED"; exit 1; }
+
+      - name: Build Image and dtbs
+        run: |
+          set -o pipefail
+          make -j"$(nproc)" O=out ARCH=arm64 \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            DTC_EXT=dtc \
+            Image dtbs 2>&1 | tee out.build.log \
+            || { echo "BUILD FAILED"; exit 1; }
+
+      - name: Collect artifacts
+        if: always()
+        run: |
+          mkdir -p artifacts
+          cp out/arch/arm64/boot/Image artifacts/ 2>/dev/null || true
+          cp out/arch/arm64/boot/Image.gz artifacts/ 2>/dev/null || true
+          cp out/arch/arm64/boot/dts/qcom/*.dtb artifacts/ 2>/dev/null || true
+          cp out/arch/arm64/boot/dts/qcom/*.dtbo artifacts/ 2>/dev/null || true
+          cp out/.config artifacts/config-raphael 2>/dev/null || true
+          cp out.build.log out.configure.log artifacts/ 2>/dev/null || true
+          ls -lh artifacts
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: raphael-4.14-image
+          path: artifacts/
+          if-no-files-found: warn
+
+      # Publish the failing log to a branch so it can be inspected without
+      # authenticated artifact access.
+      - name: Publish failure log to branch
+        if: failure()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "run: $GITHUB_RUN_ID  commit: $GITHUB_SHA"
+            echo "=== configure (tail) ==="
+            tail -40 out.configure.log 2>/dev/null
+            echo "=== build: errors ==="
+            grep -nE "error:|Error [0-9]|No rule to make|undefined reference|fatal error" out.build.log 2>/dev/null | tail -60
+            echo "=== build (tail) ==="
+            tail -120 out.build.log 2>/dev/null
+          } > ci-build-failure.log
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B ci-logs
+          git add -f ci-build-failure.log
+          git commit -m "ci: build failure log (run $GITHUB_RUN_ID)" || true
+          git push --force origin ci-logs

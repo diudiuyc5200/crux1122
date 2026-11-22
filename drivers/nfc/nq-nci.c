@@ -47,7 +47,7 @@ MODULE_DEVICE_TABLE(of, msm_match_table);
 #define DEV_COUNT	1
 #define DEVICE_NAME	"nq-nci"
 #define CLASS_NAME	"nqx"
-#define MAX_BUFFER_SIZE			(320)
+#define MAX_BUFFER_SIZE			(558)
 #define WAKEUP_SRC_TIMEOUT		(2000)
 #define MAX_RETRY_COUNT			3
 #define NCI_RESET_CMD_LEN		4
@@ -1293,7 +1293,7 @@ static int nqx_probe(struct i2c_client *client,
 	/* NFC_INT IRQ */
 	nqx_dev->irq_enabled = true;
 	r = request_irq(client->irq, nqx_dev_irq_handler,
-			  IRQF_TRIGGER_RISING, client->name, nqx_dev);
+			  IRQF_TRIGGER_HIGH, client->name, nqx_dev);
 	if (r) {
 		dev_err(&client->dev, "%s: request_irq failed\n", __func__);
 		goto err_request_irq_failed;
