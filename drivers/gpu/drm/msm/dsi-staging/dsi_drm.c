@@ -498,6 +498,13 @@ static void dsi_bridge_disable(struct drm_bridge *bridge)
 		pr_err("Invalid params\n");
 		return;
 	}
+
+	if (c_bridge->dsi_mode.dsi_mode_flags &
+			(DSI_MODE_FLAG_SEAMLESS | DSI_MODE_FLAG_VRR |
+			 DSI_MODE_FLAG_DYN_CLK)) {
+		pr_debug("[%d] seamless disable\n", c_bridge->id);
+		return;
+	}
 	display = c_bridge->display;
 
 	dsi_display_esd_irq_ctrl(display, false);

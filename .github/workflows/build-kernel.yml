@@ -7,6 +7,11 @@ on:
 permissions:
   contents: write
 
+env:
+  KNAME: Zundamon
+  KVERNUM: "1.0"
+  KSTAGE: "rc1"
+
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -21,8 +26,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
+<<<<<<< HEAD
             bc bison flex libssl-dev libelf-dev device-tree-compiler \
             gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi make
+=======
+            bc bison flex libssl-dev libelf-dev libyaml-dev device-tree-compiler \
+            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi make zip unzip curl
+>>>>>>> e186a347377e (raphael 4.14: seamless disable balance; release naming 1.0-rc1 + AnyKernel3 zip)
 
       - name: Show toolchain versions
         run: aarch64-linux-gnu-gcc --version | head -1
@@ -48,6 +58,16 @@ jobs:
             Image dtbs 2>&1 | tee out.build.log \
             || { echo "BUILD FAILED"; exit 1; }
 
+      - name: Build dtbo.img
+        run: |
+          make -j"$(nproc)" O=out ARCH=arm64 \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+            NO_YAML=1 \
+            DTC_EXT=dtc \
+            arch/arm64/boot/dts/qcom/dtbo.img || true
+          ls -l out/arch/arm64/boot/dts/qcom/dtbo.img || echo "no dtbo.img"
+
       - name: Collect artifacts
         if: always()
         run: |
@@ -56,11 +76,68 @@ jobs:
           cp out/arch/arm64/boot/Image.gz artifacts/ 2>/dev/null || true
           cp out/arch/arm64/boot/dts/qcom/*.dtb artifacts/ 2>/dev/null || true
           cp out/arch/arm64/boot/dts/qcom/*.dtbo artifacts/ 2>/dev/null || true
+          cp out/arch/arm64/boot/dts/qcom/dtbo.img artifacts/ 2>/dev/null || true
           cp out/.config artifacts/config-raphael 2>/dev/null || true
+          cp out/include/config/kernel.release artifacts/ 2>/dev/null || true
           cp out.build.log out.configure.log artifacts/ 2>/dev/null || true
           ls -lh artifacts
 
-      - name: Upload artifacts
+      - name: Package AnyKernel3 flashable zip
+        if: success()
+        run: |
+          KREL=$(cat out/include/config/kernel.release)
+          KVER=${KREL%%-*}
+          ZIPNAME="${KNAME}-${KVER}-${KVERNUM}${KSTAGE:+-$KSTAGE}.zip"
+          echo "ZIPNAME=$ZIPNAME" >> "$GITHUB_ENV"
+
+          curl -fsSL -o ak3.zip https://github.com/osm0sis/AnyKernel3/archive/refs/heads/master.zip
+          unzip -q ak3.zip
+          mv AnyKernel3-master ak3
+
+          cat > ak3/anykernel.sh <<EOF
+          properties() { '
+          kernel.string=${KNAME}-${KVER}-${KVERNUM}${KSTAGE:+-$KSTAGE} for Redmi K20 Pro (raphael), uname: ${KREL}
+          do.devicecheck=1
+          do.modules=0
+          do.systemless=0
+          do.cleanup=1
+          do.cleanuponabort=0
+          device.name1=raphael
+          device.name2=cepheus
+          supported.versions=
+          supported.patchlevels=
+          '; }
+
+          BLOCK=/dev/block/bootdevice/by-name/boot;
+          IS_SLOT_DEVICE=0;
+          RAMDISK_COMPRESSION=auto;
+          PATCH_VBMETA_FLAG=auto;
+
+          . tools/ak3-core.sh;
+
+          dump_boot;
+          write_boot;
+          EOF
+
+          cp out/arch/arm64/boot/Image ak3/Image
+          if [ -f out/arch/arm64/boot/dts/qcom/dtbo.img ]; then
+            cp out/arch/arm64/boot/dts/qcom/dtbo.img ak3/dtbo.img
+          fi
+          (cd ak3 && zip -r9 "../${ZIPNAME}" . -x '*.git*')
+          sha256sum "${ZIPNAME}" > "${ZIPNAME}.sha256"
+          ls -lh "${ZIPNAME}" "${ZIPNAME}.sha256"
+
+      - name: Upload flashable zip
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zundamon-4.14.357-${{ env.KVERNUM }}-${{ env.KSTAGE }}
+          path: |
+            Zundamon-*.zip
+            Zundamon-*.zip.sha256
+          if-no-files-found: error
+
+      - name: Upload raw artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
