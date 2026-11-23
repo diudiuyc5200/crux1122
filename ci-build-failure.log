@@ -1,0 +1,151 @@
+run: 45101669056  commit: ee4fedad14a9371b52b1431f607747e02dd24871
+=== configure (tail) ===
+make[1]: Entering directory '/home/runner/work/crux1122/crux1122/out'
+  GEN     ./Makefile
+  HOSTCC  scripts/basic/fixdep
+  HOSTCC  scripts/kconfig/conf.o
+  SHIPPED scripts/kconfig/zconf.tab.c
+  SHIPPED scripts/kconfig/zconf.lex.c
+  HOSTCC  scripts/kconfig/zconf.tab.o
+  HOSTLD  scripts/kconfig/conf
+crypto/Kconfig:1708:warning: prompt redefined
+arch/arm64/configs/raphael_defconfig:1:warning: unexpected data: <<<<<<< HEAD
+arch/arm64/configs/raphael_defconfig:3:warning: unexpected data: =======
+arch/arm64/configs/raphael_defconfig:4:warning: override: reassigning to symbol LOCALVERSION
+arch/arm64/configs/raphael_defconfig:6:warning: unexpected data: >>>>>>> e186a347377e (raphael 4.14: seamless disable balance; release naming 1.0-rc1 + AnyKernel3 zip)
+arch/arm64/configs/raphael_defconfig:398:warning: unexpected data: <<<<<<< HEAD
+arch/arm64/configs/raphael_defconfig:401:warning: unexpected data: =======
+arch/arm64/configs/raphael_defconfig:402:warning: unexpected data: >>>>>>> bb20d457351d (raphael 4.14: first fixes from audit + CI compat toolchain)
+#
+# configuration written to .config
+#
+make[1]: Leaving directory '/home/runner/work/crux1122/crux1122/out'
+=== build: errors ===
+3311:../drivers/gpu/drm/msm/dsi-staging/dsi_panel.c:3755:33: error: ‘irq_data’ undeclared (first use in this function)
+3418:make[5]: *** [../scripts/Makefile.build:364: drivers/gpu/drm/msm/dsi-staging/dsi_panel.o] Error 1
+3419:make[4]: *** [../scripts/Makefile.build:667: drivers/gpu/drm/msm] Error 2
+3420:make[3]: *** [../scripts/Makefile.build:667: drivers/gpu/drm] Error 2
+3421:make[2]: *** [../scripts/Makefile.build:667: drivers/gpu] Error 2
+3422:make[1]: *** [/home/runner/work/crux1122/crux1122/Makefile:1251: drivers] Error 2
+3670:make: *** [Makefile:153: sub-make] Error 2
+=== build (tail) ===
+  CC      net/unix/af_unix.o
+  CC      net/netfilter/nf_nat_irc.o
+  AR      net/sctp/sctp.o
+  AR      net/sctp/built-in.a
+  CC      net/wireless/core.o
+  CC      net/ipv6/output_core.o
+  CC      net/netfilter/nf_nat_tftp.o
+  CC      net/netfilter/x_tables.o
+  CC      net/ipv6/protocol.o
+  CC      net/unix/garbage.o
+  CC      net/wireless/sysfs.o
+  CC      net/ipv6/ip6_offload.o
+  CC      net/unix/sysctl_net_unix.o
+  CC      net/netfilter/xt_tcpudp.o
+  CC      net/wireless/radiotap.o
+  CC      net/unix/scm.o
+  CC      net/ipv6/tcpv6_offload.o
+  CC      net/netfilter/xt_mark.o
+  CC      net/ipv6/exthdrs_offload.o
+  CC      net/wireless/util.o
+  CC      net/netfilter/xt_connmark.o
+  AR      net/unix/unix.o
+  AR      net/unix/built-in.a
+  CC      net/wireless/reg.o
+  CC      net/ipv6/inet6_hashtables.o
+  CC      net/netfilter/xt_nat.o
+  CC      net/netfilter/xt_CLASSIFY.o
+  CC      net/ipv6/ip6_udp_tunnel.o
+  CC      net/netfilter/xt_CONNSECMARK.o
+  CC      net/wireless/scan.o
+  CC      net/netfilter/xt_CT.o
+  CC      net/ipv6/mcast_snoop.o
+  CC      net/netfilter/xt_DSCP.o
+  CC      net/xdp/xsk.o
+  CC      net/netfilter/xt_LOG.o
+  AR      net/ipv6/ipv6.o
+  AR      net/ipv6/built-in.a
+  CC      net/xfrm/xfrm_policy.o
+  CC      net/netfilter/xt_NETMAP.o
+  CC      net/wireless/nl80211.o
+  CC      net/xdp/xdp_umem.o
+  CC      net/netfilter/xt_NFLOG.o
+  CC      net/netfilter/xt_NFQUEUE.o
+  CC      net/xdp/xsk_queue.o
+  CC      net/netfilter/xt_REDIRECT.o
+  CC      net/xdp/xskmap.o
+  CC      net/netfilter/xt_SECMARK.o
+  CC      net/xfrm/xfrm_state.o
+  AR      net/xdp/built-in.a
+  CC      net/netfilter/xt_TPROXY.o
+  CC      net/wireless/mlme.o
+  CC      net/netfilter/xt_TCPMSS.o
+  CC      net/netfilter/xt_TEE.o
+  CC      net/xfrm/xfrm_hash.o
+  CC      net/netfilter/xt_TRACE.o
+  CC      net/xfrm/xfrm_input.o
+  CC      net/netfilter/xt_IDLETIMER.o
+  CC      net/compat.o
+  CC      net/netfilter/xt_HARDIDLETIMER.o
+  CC      net/xfrm/xfrm_output.o
+  CC      net/netfilter/xt_bpf.o
+  CC      net/netfilter/xt_comment.o
+  CC      net/wireless/ibss.o
+  CC      net/netfilter/xt_connlimit.o
+  CC      net/xfrm/xfrm_sysctl.o
+  CC      net/xfrm/xfrm_replay.o
+  CC      net/netfilter/xt_conntrack.o
+  CC      net/sysctl_net.o
+  CC      net/netfilter/xt_dscp.o
+  CC      net/xfrm/xfrm_device.o
+  CC      net/wireless/sme.o
+  CC      net/netfilter/xt_ecn.o
+  CC      net/wireless/chan.o
+  CC      net/xfrm/xfrm_proc.o
+  CC      net/netfilter/xt_esp.o
+  CC      net/xfrm/xfrm_algo.o
+  CC      net/netfilter/xt_hashlimit.o
+  CC      net/netfilter/xt_helper.o
+  CC      net/xfrm/xfrm_user.o
+  CC      net/wireless/ethtool.o
+  CC      net/wireless/mesh.o
+  CC      net/netfilter/xt_hl.o
+  CC      net/netfilter/xt_iprange.o
+  CC      net/xfrm/xfrm_ipcomp.o
+  CC      net/wireless/ap.o
+  CC      net/netfilter/xt_length.o
+  CC      net/wireless/trace.o
+  CC      net/wireless/ocb.o
+  CC      net/netfilter/xt_limit.o
+  CC      net/xfrm/xfrm_interface.o
+  CC      net/netfilter/xt_mac.o
+  CC      net/netfilter/xt_multiport.o
+  CC      net/netfilter/xt_owner.o
+  AR      net/xfrm/built-in.a
+  CC      net/wireless/of.o
+  CC      net/netfilter/xt_pkttype.o
+  CC      net/netfilter/xt_policy.o
+  CC      net/netfilter/xt_quota.o
+  CC      net/wireless/wext-core.o
+  CC      net/wireless/wext-proc.o
+  CC      net/netfilter/xt_quota2.o
+  CC      net/wireless/wext-spy.o
+  CC      net/netfilter/xt_socket.o
+  CC      net/netfilter/xt_state.o
+  CC      net/wireless/wext-priv.o
+  CC      net/netfilter/xt_statistic.o
+  CC      net/netfilter/xt_string.o
+  CC      net/wireless/regdb.o
+  CC      net/netfilter/xt_time.o
+  CC      net/netfilter/xt_u32.o
+  AR      net/netfilter/netfilter.o
+  AR      net/netfilter/nf_conntrack.o
+  AR      net/netfilter/nf_conntrack_h323.o
+  AR      net/netfilter/nf_nat.o
+  AR      net/netfilter/built-in.a
+  AR      net/wireless/cfg80211.o
+  AR      net/wireless/built-in.a
+  AR      net/built-in.a
+make[1]: Leaving directory '/home/runner/work/crux1122/crux1122/out'
+make: *** [Makefile:153: sub-make] Error 2
