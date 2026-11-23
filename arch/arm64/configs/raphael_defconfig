@@ -2,7 +2,6 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
-<<<<<<< HEAD
 CONFIG_LOCALVERSION="-XTurbo-v2.9"
 =======
 CONFIG_LOCALVERSION="-Zundamon-1.0-rc1"
@@ -15,9 +14,6 @@ CONFIG_LOCALVERSION="-Zundamon-v1.0-rc3"
 =======
 CONFIG_LOCALVERSION="-Zundamon-v1.0-rc5"
 >>>>>>> 1bc53f95e22d (raphael 4.14: v1.0-rc5, DC dimming drives the dim layer, NFC power-on diagnostics)
-=======
-CONFIG_LOCALVERSION="-Zundamon-v1.0-rc6"
->>>>>>> 7fdbfe569b11 (raphael 4.14: v1.0-rc6, panic timeout 5s, display save/restore logs, DC brightness init)
 # CONFIG_LOCALVERSION_AUTO is not set
 >>>>>>> e186a347377e (raphael 4.14: seamless disable balance; release naming 1.0-rc1 + AnyKernel3 zip)
 # CONFIG_FHANDLE is not set
@@ -738,13 +734,9 @@ CONFIG_NLS_UTF8=y
 CONFIG_PRINTK_TIME=y
 # CONFIG_DEBUG_INFO is not set
 CONFIG_MAGIC_SYSRQ=y
-<<<<<<< HEAD
 CONFIG_PANIC_TIMEOUT=-1
 # CONFIG_SCHEDSTATS is not set
 CONFIG_SCHED_STACK_END_CHECK=y
-=======
-CONFIG_PANIC_TIMEOUT=5
->>>>>>> 7fdbfe569b11 (raphael 4.14: v1.0-rc6, panic timeout 5s, display save/restore logs, DC brightness init)
 # CONFIG_DEBUG_PREEMPT is not set
 # CONFIG_IPC_LOGGING is not set
 CONFIG_BUG_ON_DATA_CORRUPTION=y
