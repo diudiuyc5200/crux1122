@@ -883,8 +883,7 @@ int dsi_panel_set_backlight(struct dsi_panel *panel, u32 bl_lvl)
 		return rc;
 	}
 
-	if (panel->dc_floor_enable && panel->dc_enable &&
-	    bl_temp < panel->dc_threshold && bl_temp != 0) {
+	if (panel->dc_enable && bl_temp < panel->dc_threshold && bl_temp != 0) {
 		pr_info("skip set backlight bacase dc enable %d, dim_layer_replace_dc:%d, bl %d, last_bl %d\n",
 			panel->dc_enable, panel->dim_layer_replace_dc, bl_temp, panel->last_bl_lvl);
 		panel->last_bl_lvl = bl_temp;
@@ -898,9 +897,7 @@ int dsi_panel_set_backlight(struct dsi_panel *panel, u32 bl_lvl)
 		if (panel->fod_backlight_flag) {
 			pr_info("fod_backlight_flag set\n");
 #ifdef CONFIG_PANEL_DC_DIMMING
-		} else if (panel->dc_floor_enable && bl_lvl &&
-			   bl_lvl < panel->dc_threshold &&
-			   panel->dc_dimming_enabled) {
+	} else if (bl_lvl && bl_lvl < panel->dc_threshold && panel->dc_dimming_enabled) {
 			rc = dsi_panel_update_backlight(panel, panel->dc_threshold);
 #endif
 		} else {
@@ -3924,19 +3921,6 @@ static int dsi_panel_parse_mi_config(struct dsi_panel *panel,
 		pr_info("dc backlight threshold %d \n", panel->dc_threshold);
 	}
 
-	/*
-	 * Xiaomi keeps the panel backlight at dc_threshold once DC dimming is
-	 * enabled and lets the display processor dim the picture below it.
-	 * Some third-party ROMs (ported HyperOS 3 builds on raphael) enable the
-	 * DC layer without ever dimming the frame, which leaves the panel stuck
-	 * at dc_threshold - the slider stops doing anything in the low range.
-	 * Allow the floor to be disabled, either from DT or per panel.
-	 */
-	panel->dc_floor_enable = utils->read_bool(of_node,
-			"qcom,mdss-dsi-panel-dc-floor-enable");
-	pr_info("dc backlight floor %s\n",
-		panel->dc_floor_enable ? "enabled" : "disabled");
-
 	panel->fod_dimlayer_enabled = utils->read_bool(of_node,
 								"qcom,mdss-dsi-panel-fod-dimlayer-enabled");
 	if (panel->fod_dimlayer_enabled) {
@@ -5175,16 +5159,13 @@ static int panel_disp_param_send_lock(struct dsi_panel *panel, int param)
 #ifdef CONFIG_PANEL_DC_DIMMING
 	case DISPPARAM_DC_LAYER_ON:
 		pr_info("panel dc layer on\n");
-		panel->dc_dimming_enabled = true;
-		if (panel->dc_floor_enable &&
-		    panel->last_bl_lvl < panel->dc_threshold)
+		if (panel->last_bl_lvl < panel->dc_threshold)
 			rc = dsi_panel_update_backlight(panel, panel->dc_threshold);
 		break;
 	case DISPPARAM_DC_LAYER_OFF:
 		pr_info("panel dc layer off\n");
 		panel->dc_dimming_enabled = false;
-		if (panel->dc_floor_enable &&
-		    panel->last_bl_lvl < panel->dc_threshold)
+	if (panel->last_bl_lvl < panel->dc_threshold)
 			rc = dsi_panel_update_backlight(panel, panel->last_bl_lvl);
 		break;
 #endif
@@ -5371,13 +5352,6 @@ static int panel_disp_param_send_lock(struct dsi_panel *panel, int param)
 		if (!panel->dim_layer_replace_dc) {
 			pr_info("DC on\n");
 			panel->dc_enable = true;
-			/*
-			 * The DC dimming layer is what actually lowers the
-			 * perceived brightness while DC mode is on.  Without
-			 * this the flag was only latched and nothing consumed
-			 * it, so toggling DC in the UI had no visible effect.
-			 */
-			panel->dc_dimming_enabled = true;
 		}
 		break;
 	case DISPPARAM_DC_OFF:
